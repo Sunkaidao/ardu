@@ -265,7 +265,7 @@ bool Copter::set_mode(control_mode_t mode, mode_reason_t reason)
 // called at 100hz or more
 void Copter::update_flight_mode()
 {
-    target_rangefinder_alt_used = false;
+    surface_tracking.valid_for_logging = false; // invalidate surface tracking alt, flight mode will set to true if used
 
     flightmode->run();
 }
@@ -687,12 +687,6 @@ Copter::Mode::AltHoldModeState Copter::Mode::get_alt_hold_state(float target_cli
 // pass-through functions to reduce code churn on conversion;
 // these are candidates for moving into the Mode base
 // class.
-
-float Copter::Mode::get_surface_tracking_climb_rate(int16_t target_rate, float current_alt_target, float dt)
-{
-    return copter.get_surface_tracking_climb_rate(target_rate, current_alt_target, dt);
-}
-
 float Copter::Mode::get_pilot_desired_yaw_rate(int16_t stick_angle)
 {
     return copter.get_pilot_desired_yaw_rate(stick_angle);

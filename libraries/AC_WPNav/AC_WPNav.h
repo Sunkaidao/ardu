@@ -57,6 +57,9 @@ public:
     /// provide rangefinder altitude
     void set_rangefinder_alt(bool use, bool healthy, float alt_cm) { _rangefinder_available = use; _rangefinder_healthy = healthy; _rangefinder_alt_cm = alt_cm; }
 
+    // return true if range finder may be used for terrain following
+    bool rangefinder_used() const { return _rangefinder_use && _rangefinder_healthy; }
+
     ///
     /// brake controller
     ///
@@ -102,6 +105,9 @@ public:
 
     /// get origin using position vector (distance from ekf origin in cm)
     const Vector3f &get_wp_origin() const { return _origin; }
+
+    /// true if origin.z and destination.z are alt-above-terrain, false if alt-above-ekf-origin
+    bool origin_and_destination_are_terrain_alt() const { return _terrain_alt; }
 
     /// set_wp_destination waypoint using location class
     ///     returns false if conversion from location to vector from ekf origin cannot be calculated
