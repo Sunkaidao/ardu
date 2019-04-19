@@ -11,10 +11,6 @@
 // initialise zigzag controller
 bool Copter::ModeZigZag::init(bool ignore_checks)
 {
-    if (!copter.position_ok() && !ignore_checks) {
-        return false;
-    }
-
     // initialize's loiter position and velocity on xy-axes from current pos and velocity
     loiter_nav->clear_pilot_desired_acceleration();
     loiter_nav->init_target();
@@ -42,7 +38,7 @@ void Copter::ModeZigZag::run()
     pos_control->set_max_accel_z(g.pilot_accel_z);
 
     // if not auto armed or motors not enabled set throttle to zero and exit immediately
-    if (!motors->armed() || !ap.auto_armed || !motors->get_interlock() || ap.land_complete) {
+    if (is_disarmed_or_landed() || !motors->get_interlock() ) {
         zero_throttle_and_relax_ac(copter.is_tradheli() && motors->get_interlock());
         return;
     }
@@ -143,7 +139,7 @@ void Copter::ModeZigZag::auto_control()
     }
 
     // set motors to full range
-    motors->set_desired_spool_state(AP_Motors::DESIRED_THROTTLE_UNLIMITED);
+    motors->set_desired_spool_state(AP_Motors::DesiredSpoolState::THROTTLE_UNLIMITED);
 
     // run waypoint controller
     copter.failsafe_terrain_set_status(wp_nav->update_wpnav());
@@ -187,7 +183,7 @@ void Copter::ModeZigZag::manual_control()
     }
 
     // set motors to full range
-    motors->set_desired_spool_state(AP_Motors::DESIRED_THROTTLE_UNLIMITED);
+    motors->set_desired_spool_state(AP_Motors::DesiredSpoolState::THROTTLE_UNLIMITED);
 
     // run loiter controller
     loiter_nav->update();
