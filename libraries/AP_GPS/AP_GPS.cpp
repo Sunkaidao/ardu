@@ -134,7 +134,7 @@ const AP_Param::GroupInfo AP_GPS::var_info[] = {
     // @Description: Masked with the SBP msg_type field to determine whether SBR1/SBR2 data is logged
     // @Values: 0:None (0x0000),-1:All (0xFFFF),-256:External only (0xFF00)
     // @User: Advanced
-    AP_GROUPINFO("SBP_LOGMASK", 8, AP_GPS, _sbp_logmask, 0xFF00),
+    AP_GROUPINFO("SBP_LOGMASK", 8, AP_GPS, _sbp_logmask, -256),
 
     // @Param: RAW_DATA
     // @DisplayName: Raw data logging
@@ -965,8 +965,8 @@ void AP_GPS::send_mavlink_gps2_raw(mavlink_channel_t chan)
         ground_speed(1)*100,  // cm/s
         ground_course(1)*100, // 1/100 degrees,
         num_sats(1),
-        rtk_num_sats(1),
-        rtk_age_ms(1));
+        state[1].rtk_num_sats,
+        state[1].rtk_age_ms);
 }
 
 void AP_GPS::send_mavlink_gps_rtk(mavlink_channel_t chan, uint8_t inst)

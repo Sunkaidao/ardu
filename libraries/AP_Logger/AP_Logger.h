@@ -236,6 +236,7 @@ public:
     void Write_RCIN(void);
     void Write_RCOUT(void);
     void Write_RSSI();
+    void Write_Rally();
     void Write_Baro(uint64_t time_us=0);
     void Write_Power(void);
     void Write_AHRS2(AP_AHRS &ahrs);
@@ -276,7 +277,9 @@ public:
 
     void Write(const char *name, const char *labels, const char *fmt, ...);
     void Write(const char *name, const char *labels, const char *units, const char *mults, const char *fmt, ...);
-    void WriteV(const char *name, const char *labels, const char *units, const char *mults, const char *fmt, va_list arg_list);
+    void WriteCritical(const char *name, const char *labels, const char *fmt, ...);
+    void WriteCritical(const char *name, const char *labels, const char *units, const char *mults, const char *fmt, ...);
+    void WriteV(const char *name, const char *labels, const char *units, const char *mults, const char *fmt, va_list arg_list, bool is_critical=false);
 
     // This structure provides information on the internal member data of a PID for logging purposes
     struct PID_Info {

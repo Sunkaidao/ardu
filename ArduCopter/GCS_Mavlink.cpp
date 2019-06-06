@@ -133,11 +133,11 @@ void GCS_MAVLINK_Copter::send_position_target_local_ned()
         target_pos = copter.wp_nav->get_wp_destination() * 0.01f; // convert to metres
     } else if (guided_mode == Guided_Velocity) {
         type_mask = 0x0FC7; // ignore everything except velocity
-        target_vel = copter.flightmode->pos_control->get_desired_velocity() * 0.01f; // convert to m/s
+        target_vel = copter.flightmode->get_desired_velocity() * 0.01f; // convert to m/s
     } else {
         type_mask = 0x0FC0; // ignore everything except position & velocity
         target_pos = copter.wp_nav->get_wp_destination() * 0.01f;
-        target_vel = copter.flightmode->pos_control->get_desired_velocity() * 0.01f;
+        target_vel = copter.flightmode->get_desired_velocity() * 0.01f;
     }
 
     mavlink_msg_position_target_local_ned_send(
@@ -594,7 +594,7 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_mount(const mavlink_command_long_t
     case MAV_CMD_DO_MOUNT_CONTROL:
         if(!copter.camera_mount.has_pan_control()) {
             copter.flightmode->auto_yaw.set_fixed_yaw(
-                (float)packet.param3 / 100.0f,
+                (float)packet.param3 * 0.01f,
                 0.0f,
                 0,0);
         }
@@ -604,6 +604,11 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_mount(const mavlink_command_long_t
         break;
     }
     return GCS_MAVLINK::handle_command_mount(packet);
+}
+
+bool GCS_MAVLINK_Copter::allow_disarm() const
+{
+    return copter.ap.land_complete;
 }
 
 MAV_RESULT GCS_MAVLINK_Copter::handle_command_long_packet(const mavlink_command_long_t &packet)
@@ -698,26 +703,6 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_long_packet(const mavlink_command_
         }
         return MAV_RESULT_FAILED;
 #endif
-
-    case MAV_CMD_COMPONENT_ARM_DISARM:
-        if (is_equal(packet.param1,1.0f)) {
-            // attempt to arm and return success or failure
-            const bool do_arming_checks = !is_equal(packet.param2,magic_force_arm_value);
-            if (copter.init_arm_motors(AP_Arming::Method::MAVLINK, do_arming_checks)) {
-                return MAV_RESULT_ACCEPTED;
-            }
-        } else if (is_zero(packet.param1))  {
-            if (copter.ap.land_complete || is_equal(packet.param2,magic_force_disarm_value)) {
-                // force disarming by setting param2 = 21196 is deprecated
-                copter.init_disarm_motors();
-                return MAV_RESULT_ACCEPTED;
-            } else {
-                return MAV_RESULT_FAILED;
-            }
-        } else {
-            return MAV_RESULT_UNSUPPORTED;
-        }
-        return MAV_RESULT_FAILED;
 
 #if PARACHUTE == ENABLED
     case MAV_CMD_DO_PARACHUTE:
@@ -819,7 +804,7 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_long_packet(const mavlink_command_
 
         if (!copter.motors->armed()) {
             // if disarmed, arm motors
-            copter.init_arm_motors(AP_Arming::Method::MAVLINK);
+            copter.arming.arm(AP_Arming::Method::MAVLINK);
         } else if (copter.ap.land_complete) {
             // if armed and landed, takeoff
             if (copter.set_mode(LOITER, MODE_REASON_GCS_COMMAND)) {
@@ -841,7 +826,7 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_long_packet(const mavlink_command_
         if (copter.motors->armed()) {
             if (copter.ap.land_complete) {
                 // if landed, disarm motors
-                copter.init_disarm_motors();
+                copter.arming.disarm();
             } else {
                 // assume that shots modes are all done in guided.
                 // NOTE: this may need to change if we add a non-guided shot mode
@@ -878,7 +863,7 @@ void GCS_MAVLINK_Copter::handle_mount_message(const mavlink_message_t* msg)
         if(!copter.camera_mount.has_pan_control()) {
             // if the mount doesn't do pan control then yaw the entire vehicle instead:
             copter.flightmode->auto_yaw.set_fixed_yaw(
-                mavlink_msg_mount_control_get_input_c(msg)/100.0f,
+                mavlink_msg_mount_control_get_input_c(msg) * 0.01f,
                 0.0f,
                 0,
                 0);
@@ -1309,7 +1294,7 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_flight_termination(const mavlink_command_l
     if (GCS_MAVLINK::handle_flight_termination(packet) != MAV_RESULT_ACCEPTED) {
 #endif
         if (packet.param1 > 0.5f) {
-            copter.init_disarm_motors();
+            copter.arming.disarm();
             result = MAV_RESULT_ACCEPTED;
         }
 #if ADVANCED_FAILSAFE == ENABLED
@@ -1337,7 +1322,7 @@ float GCS_MAVLINK_Copter::vfr_hud_alt() const
     if (copter.g2.dev_options.get() & DevOptionVFR_HUDRelativeAlt) {
         // compatibility option for older mavlink-aware devices that
         // assume Copter returns a relative altitude in VFR_HUD.alt
-        return copter.current_loc.alt / 100.0f;
+        return copter.current_loc.alt * 0.01f;
     }
     return GCS_MAVLINK::vfr_hud_alt();
 }

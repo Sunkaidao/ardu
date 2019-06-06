@@ -55,7 +55,7 @@ void Copter::ModeLand::gps_run()
 {
     // disarm when the landing detector says we've landed
     if (ap.land_complete && motors->get_spool_state() == AP_Motors::SpoolState::GROUND_IDLE) {
-        copter.init_disarm_motors();
+        copter.arming.disarm();
     }
 
     // Land State Machine Determination
@@ -102,11 +102,14 @@ void Copter::ModeLand::nogps_run()
 
         // get pilot's desired yaw rate
         target_yaw_rate = get_pilot_desired_yaw_rate(channel_yaw->get_control_in());
+        if (!is_zero(target_yaw_rate)) {
+            auto_yaw.set_mode(AUTO_YAW_HOLD);
+        }
     }
 
     // disarm when the landing detector says we've landed
     if (ap.land_complete && motors->get_spool_state() == AP_Motors::SpoolState::GROUND_IDLE) {
-        copter.init_disarm_motors();
+        copter.arming.disarm();
     }
 
     // Land State Machine Determination

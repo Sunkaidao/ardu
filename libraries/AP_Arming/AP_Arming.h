@@ -14,6 +14,8 @@ public:
     AP_Arming(const AP_Arming &other) = delete;
     AP_Arming &operator=(const AP_Arming&) = delete;
 
+    static AP_Arming *get_singleton();
+
     enum ArmingChecks {
         ARMING_CHECK_NONE       = 0x0000,
         ARMING_CHECK_ALL        = 0x0001,
@@ -49,7 +51,7 @@ public:
     // these functions should not be used by Copter which holds the armed state in the motors library
     Required arming_required();
     virtual bool arm(AP_Arming::Method method, bool do_arming_checks=true);
-    bool disarm();
+    virtual bool disarm();
     bool is_armed();
 
     // get bitmask of enabled checks
@@ -61,7 +63,7 @@ public:
     // some arming checks have side-effects, or require some form of state
     // change to have occurred, and thus should not be done as pre-arm
     // checks.  Those go here:
-    bool arm_checks(AP_Arming::Method method);
+    virtual bool arm_checks(AP_Arming::Method method);
 
     // get expected magnetic field strength
     uint16_t compass_magfield_expected() const;
@@ -120,7 +122,9 @@ protected:
     virtual bool system_checks(bool report);
 
     bool can_checks(bool report);
-    
+
+    virtual bool proximity_checks(bool report) const;
+
     bool servo_checks(bool report) const;
     bool rc_checks_copter_sub(bool display_failure, const RC_Channel *channels[4]) const;
 
@@ -131,7 +135,11 @@ protected:
     // handle the case where a check fails
     void check_failed(const enum AP_Arming::ArmingChecks check, bool report, const char *fmt, ...) const;
 
+    void Log_Write_Arm_Disarm();
+
 private:
+
+    static AP_Arming *_singleton;
 
     bool ins_accels_consistent(const AP_InertialSensor &ins);
     bool ins_gyros_consistent(const AP_InertialSensor &ins);
@@ -145,4 +153,8 @@ private:
         MIS_ITEM_CHECK_RALLY         = (1 << 5),
         MIS_ITEM_CHECK_MAX
     };
+};
+
+namespace AP {
+    AP_Arming &arming();
 };

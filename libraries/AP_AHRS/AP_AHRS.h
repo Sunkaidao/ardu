@@ -29,9 +29,9 @@
 #include <AP_InertialSensor/AP_InertialSensor.h>
 #include <AP_Baro/AP_Baro.h>
 #include <AP_Param/AP_Param.h>
-#include <AP_Common/Semaphore.h>
 #include <AP_Common/Location.h>
 
+class AP_NMEA_Output;
 class OpticalFlow;
 #define AP_AHRS_TRIM_LIMIT 10.0f        // maximum trim angle in degrees
 #define AP_AHRS_RP_P_MIN   0.05f        // minimum value for AHRS_RP_P parameter
@@ -87,9 +87,7 @@ public:
     }
 
     // init sets up INS board orientation
-    virtual void init() {
-        update_orientation();
-    };
+    virtual void init();
 
     // Accessors
     void set_fly_forward(bool b) {
@@ -301,10 +299,7 @@ public:
 
     // get apparent to true airspeed ratio
     float get_EAS2TAS(void) const {
-        if (_airspeed) {
-            return _airspeed->get_EAS2TAS();
-        }
-        return 1.0f;
+        return AP::baro().get_EAS2TAS();
     }
 
     // return true if airspeed comes from an airspeed sensor, as
@@ -591,6 +586,7 @@ public:
     }
 
 protected:
+    void update_nmea_out();
 
     // multi-thread access support
     HAL_Semaphore_Recursive _rsem;
@@ -699,6 +695,7 @@ protected:
 private:
     static AP_AHRS *_singleton;
 
+    AP_NMEA_Output* _nmea_out;
 };
 
 #include "AP_AHRS_DCM.h"

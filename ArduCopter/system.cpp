@@ -137,6 +137,7 @@ void Copter::init_ardupilot()
     gps.set_log_gps_bit(MASK_LOG_GPS);
     gps.init(serial_manager);
 
+    AP::compass().set_log_bit(MASK_LOG_COMPASS);
     AP::compass().init();
 
 #if OPTFLOW == ENABLED
@@ -148,11 +149,6 @@ void Copter::init_ardupilot()
 #if AP_TERRAIN_AVAILABLE && AC_TERRAIN
     Location::set_terrain(&terrain);
     wp_nav->set_terrain(&terrain);
-#endif
-
-#if AC_AVOID_ENABLED == ENABLED
-    wp_nav->set_avoidance(&avoid);
-    loiter_nav->set_avoidance(&avoid);
 #endif
 
     attitude_control->parameter_sanity_check();

@@ -2846,6 +2846,76 @@ class AutoTestCopter(AutoTest):
                                        (tdelta, max_good_tdelta))
         self.progress("Vehicle returned")
 
+    def test_onboard_compass_calibration(self, timeout=240):
+        twist_x = 2.1
+        twist_y = 2.2
+        twist_z = 2.3
+        ex = None
+        self.context_push()
+        try:
+            self.set_parameter("SIM_GND_BEHAV", 0)
+            self.set_parameter("AHRS_EKF_TYPE", 10)
+            self.reboot_sitl()
+
+            report = self.mav.messages.get("MAG_CAL_REPORT", None)
+            if report is not None:
+                raise PreconditionFailedException("MAG_CAL_REPORT found")
+
+            self.run_cmd(mavutil.mavlink.MAV_CMD_DO_START_MAG_CAL,
+                         1, # bitmask of compasses to calibrate
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         0,
+                         timeout=1)
+            tstart = self.get_sim_time()
+            last_twist_time = 0
+            while True:
+                now = self.get_sim_time_cached()
+                if now - tstart > timeout:
+                    raise NotAchievedException("timeout before cal complete")
+                report = self.mav.messages.get("MAG_CAL_REPORT", None)
+                if report is not None:
+                    print("Report: %s" % str(report))
+                    break
+                if now - last_twist_time > 5:
+                    last_twist_time = now
+                    twist_x *= 1.1
+                    twist_y *= 1.2
+                    twist_z *= 1.3
+                    if abs(twist_x) > 10:
+                        twist_x /= -2
+                    if abs(twist_y) > 10:
+                        twist_y /= -2
+                    if abs(twist_z) > 10:
+                        twist_z /= -2
+                    self.set_parameter("SIM_TWIST_X", twist_x)
+                    self.set_parameter("SIM_TWIST_Y", twist_y)
+                    self.set_parameter("SIM_TWIST_Z", twist_z)
+                    try:
+                        self.set_parameter("SIM_TWIST_TIME", 100)
+                    except ValueError as e:
+                        # the shove resets this to zero
+                        pass
+
+                m = self.mav.recv_match(type="MAG_CAL_PROGRESS", timeout=1)
+                self.progress("progress: %s" % str(m))
+                if m is None:
+                    continue
+                att = self.mav.messages.get("ATTITUDE", None)
+                self.progress("Attitude: %f %f %f" %
+                              (math.degrees(att.roll), math.degrees(att.pitch), math.degrees(att.yaw)))
+        except Exception as e:
+            print("Exception caught: %s" % str(e))
+            ex = e
+
+        self.context_pop()
+        self.reboot_sitl()
+        if ex is not None:
+            raise ex
+
     def fly_brake_mode(self):
         # test brake mode
         self.progress("Testing brake mode")
@@ -2922,7 +2992,7 @@ class AutoTestCopter(AutoTest):
             self.loiter_to_ne(start.x + 5, start.y - 10, start.z + 10)
 
         except Exception as e:
-            self.progress("Exception caught: %s" % traceback.format_exc(e))
+            self.progress("Exception caught: %s" % self.get_exception_stacktrace(e))
             ex = e
 
         self.context_pop()
@@ -3070,6 +3140,114 @@ class AutoTestCopter(AutoTest):
             0) # button mask
         self.do_RTL()
 
+    def check_avoidance_corners(self):
+            self.takeoff(10, mode="LOITER")
+            self.set_rc(2, 1400)
+            west_loc = mavutil.location(-35.363007,
+	                                    149.164911,
+                                        0,
+                                        0)
+            self.wait_location(west_loc, accuracy=6)
+            north_loc = mavutil.location(-35.362908,
+                                         149.165051,
+                                         0,
+                                         0)
+            self.reach_heading_manual(0);
+            self.wait_location(north_loc, accuracy=6)
+            self.reach_heading_manual(90);
+            east_loc = mavutil.location(-35.363013,
+                                        149.165194,
+                                        0,
+                                        0)
+            self.wait_location(east_loc, accuracy=6)
+            self.reach_heading_manual(225);
+            self.wait_location(west_loc, accuracy=6)
+            self.set_rc(2, 1500)
+            self.do_RTL()
+
+    def fly_proximity_avoidance_test(self):
+        self.context_push()
+        ex = None
+        try:
+            avoid_filepath = os.path.join(self.mission_directory(),
+                                          "copter-avoidance-fence.txt")
+            self.mavproxy.send("fence load %s\n" % avoid_filepath)
+            self.mavproxy.expect("Loaded 5 geo-fence")
+            self.set_parameter("FENCE_ENABLE", 0)
+            self.set_parameter("PRX_TYPE", 10)
+            self.set_parameter("RC10_OPTION", 40) # proximity-enable
+            self.reboot_sitl()
+            self.progress("Enabling proximity")
+            self.set_rc(10, 2000)
+            self.check_avoidance_corners()
+        except Exception as e:
+            self.progress("Caught exception: %s" % str(e))
+            ex = e
+        self.context_pop()
+        self.mavproxy.send("fence clear\n")
+        self.disarm_vehicle(force=True)
+        self.reboot_sitl()
+        if ex is not None:
+            raise ex
+
+    def fly_fence_avoidance_test(self):
+        self.context_push()
+        ex = None
+        try:
+            avoid_filepath = os.path.join(self.mission_directory(),
+                                          "copter-avoidance-fence.txt")
+            self.mavproxy.send("fence load %s\n" % avoid_filepath)
+            self.mavproxy.expect("Loaded 5 geo-fence")
+            self.set_parameter("FENCE_ENABLE", 1)
+            self.check_avoidance_corners()
+        except Exception as e:
+            self.progress("Caught exception: %s" % str(e))
+            ex = e
+        self.context_pop()
+        self.mavproxy.send("fence clear\n")
+        self.disarm_vehicle(force=True)
+        if ex is not None:
+            raise ex
+
+    def fly_beacon_avoidance_test(self):
+        self.context_push()
+        ex = None
+        try:
+            self.set_parameter("BCN_TYPE", 10)
+            self.set_parameter("BCN_LATITUDE", int(SITL_START_LOCATION.lat))
+            self.set_parameter("BCN_LONGITUDE", int(SITL_START_LOCATION.lng))
+            self.set_parameter("BCN_ORIENT_YAW", 45)
+            self.set_parameter("AVOID_ENABLE", 4)
+            self.reboot_sitl()
+
+            self.takeoff(10, mode="LOITER")
+            self.set_rc(2, 1400)
+            west_loc = mavutil.location(-35.362919, 149.165055, 0, 0)
+            self.wait_location(west_loc, accuracy=7)
+            self.reach_heading_manual(0)
+            north_loc = mavutil.location(-35.362881, 149.165103, 0, 0)
+            self.wait_location(north_loc, accuracy=7)
+            self.set_rc(2, 1500)
+            self.set_rc(1, 1600)
+            east_loc = mavutil.location(-35.362986, 149.165227, 0, 0)
+            self.wait_location(east_loc, accuracy=7)
+            self.set_rc(1, 1500)
+            self.set_rc(2, 1600)
+            south_loc = mavutil.location(-35.363025, 149.165182, 0, 0)
+            self.wait_location(south_loc, accuracy=7)
+            self.set_rc(2, 1500)
+            self.do_RTL()
+
+        except Exception as e:
+            self.progress("Caught exception: %s" % str(e))
+            ex = e
+        self.context_pop()
+        self.mavproxy.send("fence clear\n")
+        self.disarm_vehicle(force=True)
+        self.reboot_sitl()
+        if ex is not None:
+            raise ex
+
     def tests(self):
         '''return list of all tests'''
         ret = super(AutoTestCopter, self).tests()
@@ -3136,6 +3314,18 @@ class AutoTestCopter(AutoTest):
             ("StabilityPatch",
              "Fly stability patch",
              lambda: self.fly_stability_patch(30)),
+
+            ("AC_Avoidance_Proximity",
+             "Test proximity avoidance slide behaviour",
+             self.fly_proximity_avoidance_test),
+
+            ("AC_Avoidance_Fence",
+             "Test fence avoidance slide behaviour",
+             self.fly_fence_avoidance_test),
+
+            ("AC_Avoidance_Beacon",
+             "Test beacon avoidance slide behaviour",
+             self.fly_beacon_avoidance_test),
 
             ("HorizontalFence",
              "Test horizontal fence",
@@ -3236,6 +3426,10 @@ class AutoTestCopter(AutoTest):
             ("PosHoldTakeOff",
              "Fly POSHOLD takeoff",
              self.fly_poshold_takeoff),
+
+            ("OnboardCompassCalibration",
+             "Test onboard compass calibration",
+             self.test_onboard_compass_calibration),
 
             ("LogDownLoad",
              "Log download",
@@ -3380,13 +3574,20 @@ class AutoTestHeli(AutoTestCopter):
         self.load_mission("copter_spline_mission.txt")
         self.change_mode("LOITER")
         self.wait_ready_to_arm()
+        self.arm_vehicle()
         self.progress("Raising rotor speed")
         self.set_rc(8, 2000)
-        self.arm_vehicle()
         self.wait_seconds(20)
         self.change_mode("AUTO")
         self.set_rc(3, 1500)
-        self.mav.motors_disarmed_wait()
+        tstart = self.get_sim_time()
+        while True:
+            if not self.armed():
+                break
+            remaining = self.get_sim_time() - tstart
+            if remaining <= 0:
+                raise AutoTestTimeoutException("Vehicle did not disarm after mission")
+            self.delay_sim_time(1)
         self.progress("Lowering rotor speed")
         self.set_rc(8, 1000)
 

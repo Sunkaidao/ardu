@@ -59,7 +59,7 @@ const AP_Scheduler::Task Plane::scheduler_tasks[] = {
     SCHED_TASK_CLASS(AP_Notify,      &plane.notify,  update, 50, 300),
     SCHED_TASK(read_rangefinder,       50,    100),
     SCHED_TASK_CLASS(AP_ICEngine, &plane.g2.ice_control, update, 10, 100),
-    SCHED_TASK(compass_cal_update,     50,    50),
+    SCHED_TASK_CLASS(Compass,          &plane.compass,              cal_update, 50, 50),
     SCHED_TASK(accel_cal_update,       10,    50),
 #if OPTFLOW == ENABLED
     SCHED_TASK_CLASS(OpticalFlow, &plane.optflow, update,    50,    50),
@@ -108,7 +108,7 @@ const AP_Scheduler::Task Plane::scheduler_tasks[] = {
 #endif
 };
 
-constexpr int8_t Plane::_failsafe_priorities[6];
+constexpr int8_t Plane::_failsafe_priorities[7];
 
 void Plane::setup() 
 {
@@ -129,17 +129,10 @@ void Plane::loop()
     G_Dt = scheduler.get_loop_period_s();
 }
 
-void Plane::update_soft_armed()
-{
-    hal.util->set_soft_armed(arming.is_armed() &&
-                             hal.util->safety_switch_state() != AP_HAL::Util::SAFETY_DISARMED);
-    logger.set_vehicle_armed(hal.util->get_soft_armed());
-}
-
 // update AHRS system
 void Plane::ahrs_update()
 {
-    update_soft_armed();
+    arming.update_soft_armed();
 
 #if HIL_SUPPORT
     if (g.hil_mode == 1) {
@@ -202,9 +195,6 @@ void Plane::update_compass(void)
 {
     if (AP::compass().enabled() && compass.read()) {
         ahrs.set_compass(&compass);
-        if (should_log(MASK_LOG_COMPASS) && !ahrs.have_ekf_logging()) {
-            logger.Write_Compass();
-        }
     }
 }
 
@@ -261,9 +251,6 @@ extern AP_IOMCU iomcu;
 
 void Plane::one_second_loop()
 {
-    // send a heartbeat
-    gcs().send_message(MSG_HEARTBEAT);
-
     // make it possible to change control channel ordering at runtime
     set_control_channels();
 
@@ -469,7 +456,7 @@ void Plane::update_navigation()
     case Mode::Number::RTL:
         if (quadplane.available() && quadplane.rtl_mode == 1 &&
             (nav_controller->reached_loiter_target() ||
-             location_passed_point(current_loc, prev_WP_loc, next_WP_loc) ||
+             current_loc.past_interval_finish_line(prev_WP_loc, next_WP_loc) ||
              auto_state.wp_distance < MAX(qrtl_radius, quadplane.stopping_distance())) &&
             AP_HAL::millis() - last_mode_change_ms > 1000) {
             /*
@@ -580,7 +567,9 @@ void Plane::update_alt()
 
     // low pass the sink rate to take some of the noise out
     auto_state.sink_rate = 0.8f * auto_state.sink_rate + 0.2f*sink_rate;
-    
+#if PARACHUTE == ENABLED
+    parachute.set_sink_rate(auto_state.sink_rate);
+#endif
     geofence_check(true);
 
     update_flight_stage();
@@ -588,7 +577,7 @@ void Plane::update_alt()
     if (auto_throttle_mode && !throttle_suppressed) {        
 
         float distance_beyond_land_wp = 0;
-        if (flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND && location_passed_point(current_loc, prev_WP_loc, next_WP_loc)) {
+        if (flight_stage == AP_Vehicle::FixedWing::FLIGHT_LAND && current_loc.past_interval_finish_line(prev_WP_loc, next_WP_loc)) {
             distance_beyond_land_wp = current_loc.get_distance(next_WP_loc);
         }
 
@@ -651,9 +640,6 @@ void Plane::update_flight_stage(void)
     } else {
         set_flight_stage(AP_Vehicle::FixedWing::FLIGHT_NORMAL);
     }
-
-    // tell AHRS the airspeed to true airspeed ratio
-    airspeed.set_EAS2TAS(barometer.get_EAS2TAS());
 }
 
 
@@ -672,7 +658,7 @@ void Plane::disarm_if_autoland_complete()
         arming.is_armed()) {
         /* we have auto disarm enabled. See if enough time has passed */
         if (millis() - auto_state.last_flying_ms >= landing.get_disarm_delay()*1000UL) {
-            if (disarm_motors()) {
+            if (arming.disarm()) {
                 gcs().send_text(MAV_SEVERITY_INFO,"Auto disarmed");
             }
         }

@@ -42,7 +42,7 @@ public:
     // get altitude (in cm) in the desired frame
     // returns false on failure to get altitude in the desired frame which
     // can only happen if the original frame or desired frame is above-terrain
-    bool get_alt_cm(AltFrame desired_frame, int32_t &ret_alt_cm) const;
+    bool get_alt_cm(AltFrame desired_frame, int32_t &ret_alt_cm) const WARN_IF_UNUSED;
 
     // get altitude frame
     AltFrame get_alt_frame() const;
@@ -56,8 +56,8 @@ public:
     // return false on failure to get the vector which can only
     // happen if the EKF origin has not been set yet
     // x, y and z are in centimetres
-    bool get_vector_xy_from_origin_NE(Vector2f &vec_ne) const;
-    bool get_vector_from_origin_NEU(Vector3f &vec_neu) const;
+    bool get_vector_xy_from_origin_NE(Vector2f &vec_ne) const WARN_IF_UNUSED;
+    bool get_vector_from_origin_NEU(Vector3f &vec_neu) const WARN_IF_UNUSED;
 
     // return distance in meters between two locations
     float get_distance(const struct Location &loc2) const;
@@ -80,7 +80,7 @@ public:
     // longitude/latitude points to meters or centimeters
     float longitude_scale() const;
 
-    bool is_zero(void) const;
+    bool is_zero(void) const WARN_IF_UNUSED;
 
     void zero(void);
 
@@ -98,6 +98,26 @@ public:
     // return true when lat and lng are within range
     bool check_latlng() const;
 
+    // see if location is past a line perpendicular to
+    // the line between point1 and point2 and passing through point2.
+    // If point1 is our previous waypoint and point2 is our target waypoint
+    // then this function returns true if we have flown past
+    // the target waypoint
+    bool past_interval_finish_line(const Location &point1, const Location &point2) const;
+
+    /*
+      return the proportion we are along the path from point1 to
+      point2, along a line parallel to point1<->point2.
+      This will be more than 1 if we have passed point2
+     */
+    float line_path_proportion(const Location &point1, const Location &point2) const;
+
 private:
     static AP_Terrain *_terrain;
+
+    // scaling factor from 1e-7 degrees to meters at equator
+    // == 1.0e-7 * DEG_TO_RAD * RADIUS_OF_EARTH
+    static constexpr float LOCATION_SCALING_FACTOR = 0.011131884502145034f;
+    // inverse of LOCATION_SCALING_FACTOR
+    static constexpr float LOCATION_SCALING_FACTOR_INV = 89.83204953368922f;
 };

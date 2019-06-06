@@ -123,7 +123,7 @@ public:
     const Vector3f &get_field(void) const { return get_field(get_primary()); }
 
     // compass calibrator interface
-    void compass_cal_update();
+    void cal_update();
 
     // per-motor calibration access
     void per_motor_calibration_start(void) {
@@ -142,6 +142,9 @@ public:
 
     bool compass_cal_requires_reboot() const { return _cal_complete_requires_reboot; }
     bool is_calibrating() const;
+
+    // indicate which bit in LOG_BITMASK indicates we should log compass readings
+    void set_log_bit(uint32_t log_bit) { _log_bit = log_bit; }
 
     /*
       handle an incoming MAG_CAL command
@@ -355,7 +358,7 @@ private:
 
     // enum of drivers for COMPASS_TYPEMASK
     enum DriverType {
-        DRIVER_HMC5883  =0,
+        DRIVER_HMC5843  =0,
         DRIVER_LSM303D  =1,
         DRIVER_AK8963   =2,
         DRIVER_BMM150   =3,
@@ -403,6 +406,9 @@ private:
 
     // first-time-around flag used by offset nulling
     bool        _null_init_done;
+
+    // stores which bit is used to indicate we should log compass readings
+    uint32_t _log_bit = -1;
 
     // used by offset correction
     static const uint8_t _mag_history_size = 20;

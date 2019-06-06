@@ -245,7 +245,7 @@ private:
         uint32_t last_healthy_ms;
         LowPassFilterFloat alt_cm_filt; // altitude filter
         int8_t glitch_count;
-    } rangefinder_state = { false, false, 0, 0 };
+    } rangefinder_state;
 
     struct {
         float target_alt_cm;        // desired altitude in cm above the ground
@@ -472,11 +472,7 @@ private:
 #endif
 
 #if AC_AVOID_ENABLED == ENABLED
-# if BEACON_ENABLED == ENABLED
-    AC_Avoid avoid{ahrs, fence, g2.proximity, &g2.beacon};
-# else
-    AC_Avoid avoid{ahrs, fence, g2.proximity};
-# endif
+    AC_Avoid avoid;
 #endif
 
     // Rally library
@@ -756,8 +752,6 @@ private:
     // motors.cpp
     void arm_motors_check();
     void auto_disarm_check();
-    bool init_arm_motors(AP_Arming::Method method, bool do_arming_checks=true);
-    void init_disarm_motors();
     void motors_output();
     void lost_vehicle_check();
 

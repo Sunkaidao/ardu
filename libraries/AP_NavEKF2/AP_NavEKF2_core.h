@@ -494,6 +494,9 @@ private:
     // constrain states
     void ConstrainStates();
 
+    // constrain earth field using WMM tables
+    void MagTableConstrain(void);
+
     // fuse selected position, velocity and height measurements
     void FuseVelPosNED();
 
@@ -724,6 +727,9 @@ private:
     // Input is 1-sigma uncertainty in published declination
     void FuseDeclination(float declErr);
 
+    // return magnetic declination in radians
+    float MagDeclination(void) const;
+    
     // Propagate PVA solution forward from the fusion time horizon to the current time horizon
     // using a simple observer
     void calcOutputStates();
@@ -755,6 +761,7 @@ private:
     // Length of FIFO buffers used for non-IMU sensor data.
     // Must be larger than the time period defined by IMU_BUFFER_LENGTH
     static const uint32_t OBS_BUFFER_LENGTH = 5;
+    static const uint32_t FLOW_BUFFER_LENGTH = 15;
 
     // Variables
     bool statesInitialised;         // boolean true when filter states have been initialised
@@ -1169,6 +1176,11 @@ private:
     AP_HAL::Util::perf_counter_t  _perf_TerrainOffset;
     AP_HAL::Util::perf_counter_t  _perf_FuseOptFlow;
     AP_HAL::Util::perf_counter_t  _perf_test[10];
+
+    // earth field from WMM tables
+    bool have_table_earth_field;   // true when we have initialised table_earth_field_ga
+    Vector3f table_earth_field_ga; // earth field from WMM tables
+    float table_declination;       // declination in radians from the tables
 
     // timing statistics
     struct ekf_timing timing;
