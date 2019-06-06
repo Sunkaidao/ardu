@@ -829,7 +829,6 @@ private:
     void Log_Write_Nav_Tuning();
     void Log_Write_Status();
     void Log_Write_Sonar();
-    void Log_Arm_Disarm();
     void Log_Write_RC(void);
     void Log_Write_Vehicle_Startup_Messages();
     void Log_Write_AOA_SSA();
@@ -947,9 +946,6 @@ private:
     void startup_INS_ground(void);
     bool should_log(uint32_t mask);
     int8_t throttle_percentage(void);
-    void change_arm_state(void);
-    bool disarm_motors(void);
-    bool arm_motors(AP_Arming::Method method, bool do_arming_checks=true);
     bool auto_takeoff_check(void);
     void takeoff_calc_roll(void);
     void takeoff_calc_pitch(void);
@@ -966,7 +962,6 @@ private:
 #if ADVANCED_FAILSAFE == ENABLED
     void afs_fs_check(void);
 #endif
-    void compass_cal_update();
     void update_optical_flow(void);
     void one_second_loop(void);
     void airspeed_ratio_update(void);
@@ -1004,7 +999,6 @@ private:
     bool stick_mixing_enabled(void);
     void stabilize_roll(float speed_scaler);
     void stabilize_pitch(float speed_scaler);
-    static void stick_mix_channel(RC_Channel *channel, int16_t &servo_out);
     void stabilize_stick_mixing_direct();
     void stabilize_stick_mixing_fbw();
     void stabilize_yaw(float speed_scaler);
@@ -1054,7 +1048,6 @@ private:
     void publish_osd_info();
 #endif
     void accel_cal_update(void);
-    void update_soft_armed();
 #if SOARING_ENABLED == ENABLED
     void update_soaring();
 #endif
@@ -1075,11 +1068,13 @@ private:
         Failsafe_Action_Land      = 2,
         Failsafe_Action_Terminate = 3,
         Failsafe_Action_QLand     = 4,
+        Failsafe_Action_Parachute = 5
     };
 
     // list of priorities, highest priority first
     static constexpr int8_t _failsafe_priorities[] = {
                                                       Failsafe_Action_Terminate,
+                                                      Failsafe_Action_Parachute,
                                                       Failsafe_Action_QLand,
                                                       Failsafe_Action_Land,
                                                       Failsafe_Action_RTL,

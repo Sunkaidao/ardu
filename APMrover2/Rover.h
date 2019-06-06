@@ -65,6 +65,7 @@
 #include <AP_WheelEncoder/AP_WheelEncoder.h>
 #include <AP_WheelEncoder/AP_WheelRateControl.h>
 #include <APM_Control/AR_AttitudeControl.h>
+#include <AR_WPNav/AR_WPNav.h>
 #include <AP_SmartRTL/AP_SmartRTL.h>
 #include <AP_Logger/AP_Logger.h>
 #include <Filter/AverageFilter.h>                   // Mode Filter from Filter library
@@ -92,6 +93,7 @@
 #include "AP_MotorsUGV.h"
 #include "mode.h"
 #include "AP_Arming.h"
+#include "sailboat.h"
 // Configuration
 #include "config.h"
 #include "defines.h"
@@ -130,6 +132,8 @@ public:
 
     friend class RC_Channel_Rover;
     friend class RC_Channels_Rover;
+
+    friend class Sailboat;
 
     Rover(void);
 
@@ -197,9 +201,6 @@ private:
     AP_Arming_Rover arming;
 
     AP_L1_Control L1_controller{ahrs, nullptr};
-
-    // selected navigation controller
-    AP_Navigation *nav_controller;
 
 #if AP_AHRS_NAVEKF_AVAILABLE
     OpticalFlow optflow;
@@ -307,9 +308,6 @@ private:
     // flyforward timer
     uint32_t flyforward_start_ms;
 
-    // true if pivoting (set by use_pivot_steering)
-    bool pivot_steering_active;
-
     static const AP_Scheduler::Task scheduler_tasks[];
 
     static const AP_Param::Info var_info[];
@@ -351,18 +349,6 @@ private:
         uint32_t log_count;
     } cruise_learn_t;
     cruise_learn_t cruise_learn;
-
-    // sailboat variables
-    enum Sailboat_Tack {
-        TACK_PORT,
-        TACK_STARBOARD
-    };
-    struct {
-        bool tacking;                   // true when sailboat is in the process of tacking to a new heading
-        float tack_heading_rad;         // target heading in radians while tacking in either acro or autonomous modes
-        uint32_t auto_tack_request_ms;  // system time user requested tack in autonomous modes
-        uint32_t auto_tack_start_ms;    // system time when tack was started in autonomous mode
-    } sailboat;
 
 private:
 
@@ -420,7 +406,6 @@ private:
     void send_wheel_encoder_distance(mavlink_channel_t chan);
 
     // Log.cpp
-    void Log_Write_Arm_Disarm();
     void Log_Write_Attitude();
     void Log_Write_Depth();
     void Log_Write_GuidedTarget(uint8_t target_type, const Vector3f& pos_target, const Vector3f& vel_target);
@@ -449,21 +434,9 @@ private:
     void radio_failsafe_check(uint16_t pwm);
     bool trim_radio();
 
-    // sailboat.cpp
-    void sailboat_update_mainsail(float desired_speed);
-    float sailboat_get_VMG() const;
-    void sailboat_handle_tack_request_acro();
-    float sailboat_get_tack_heading_rad() const;
-    void sailboat_handle_tack_request_auto();
-    void sailboat_clear_tack();
-    bool sailboat_tacking() const;
-    bool sailboat_use_indirect_route(float desired_heading_cd) const;
-    float sailboat_calc_heading(float desired_heading_cd);
-
     // sensors.cpp
     void init_compass_location(void);
     void update_compass(void);
-    void compass_cal_update(void);
     void compass_save(void);
     void init_beacon();
     void init_visual_odom();
@@ -475,8 +448,6 @@ private:
     void rpm_update(void);
 
     // Steering.cpp
-    bool use_pivot_steering_at_next_WP(float yaw_error_cd);
-    bool use_pivot_steering(float yaw_error_cd);
     void set_servos(void);
 
     // system.cpp
@@ -490,9 +461,6 @@ private:
     void notify_mode(const Mode *new_mode);
     uint8_t check_digital_pin(uint8_t pin);
     bool should_log(uint32_t mask);
-    void change_arm_state(void);
-    bool arm_motors(AP_Arming::Method method);
-    bool disarm_motors(void);
     bool is_boat() const;
 
     enum Failsafe_Action {
@@ -520,7 +488,6 @@ private:
 public:
     void mavlink_delay_cb();
     void failsafe_check();
-    void update_soft_armed();
     // Motor test
     void motor_test_output();
     bool mavlink_motor_test_check(mavlink_channel_t chan, bool check_rc, uint8_t motor_seq, uint8_t throttle_type, int16_t throttle_value);
@@ -533,6 +500,9 @@ public:
 
     // Simple mode
     float simple_sin_yaw;
+
+    // sailboat enabled
+    bool get_sailboat_enable() { return g2.sailboat.enabled(); }
 };
 
 extern const AP_HAL::HAL& hal;

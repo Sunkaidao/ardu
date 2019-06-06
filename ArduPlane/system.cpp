@@ -109,6 +109,7 @@ void Plane::init_ardupilot()
     // initialise airspeed sensor
     airspeed.init();
 
+    AP::compass().set_log_bit(MASK_LOG_COMPASS);
     AP::compass().init();
 
 #if OPTFLOW == ENABLED
@@ -394,7 +395,8 @@ void Plane::startup_INS_ground(void)
 
     if (ins.gyro_calibration_timing() != AP_InertialSensor::GYRO_CAL_NEVER) {
         gcs().send_text(MAV_SEVERITY_ALERT, "Beginning INS calibration. Do not move plane");
-        hal.scheduler->delay(100);
+    } else {
+        gcs().send_text(MAV_SEVERITY_ALERT, "Skipping INS calibration");
     }
 
     ahrs.init();
@@ -451,57 +453,4 @@ int8_t Plane::throttle_percentage(void)
         return constrain_int16(throttle, 0, 100);
     }
     return constrain_int16(throttle, -100, 100);
-}
-
-/*
-  update AHRS soft arm state and log as needed
- */
-void Plane::change_arm_state(void)
-{
-    Log_Arm_Disarm();
-    update_soft_armed();
-    quadplane.set_armed(hal.util->get_soft_armed());
-}
-
-/*
-  arm motors
- */
-bool Plane::arm_motors(const AP_Arming::Method method, const bool do_arming_checks)
-{
-    if (!arming.arm(method, do_arming_checks)) {
-        return false;
-    }
-
-    change_arm_state();
-    return true;
-}
-
-/*
-  disarm motors
- */
-bool Plane::disarm_motors(void)
-{
-    if (!arming.disarm()) {
-        return false;
-    }
-    if (control_mode != &mode_auto) {
-        // reset the mission on disarm if we are not in auto
-        mission.reset();
-    }
-
-    // suppress the throttle in auto-throttle modes
-    throttle_suppressed = auto_throttle_mode;
-    
-    //only log if disarming was successful
-    change_arm_state();
-
-    // reload target airspeed which could have been modified by a mission
-    plane.aparm.airspeed_cruise_cm.load();
-    
-#if QAUTOTUNE_ENABLED
-    //save qautotune gains if enabled and success
-    quadplane.qautotune.save_tuning_gains();
-#endif
-
-    return true;
 }

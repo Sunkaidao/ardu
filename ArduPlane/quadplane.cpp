@@ -145,7 +145,7 @@ const AP_Param::GroupInfo QuadPlane::var_info[] = {
     // @Param: FRAME_TYPE
     // @DisplayName: Frame Type (+, X or V)
     // @Description: Controls motor mixing for multicopter component
-    // @Values: 0:Plus, 1:X, 2:V, 3:H, 4:V-Tail, 5:A-Tail, 10:Y6B, 11:Y6F
+    // @Values: 0:Plus, 1:X, 2:V, 3:H, 4:V-Tail, 5:A-Tail, 10:Y6B, 11:Y6F, 12:BetaFlightX, 13:DJIX, 14:ClockwiseX, 15: I
     // @User: Standard
     AP_GROUPINFO("FRAME_TYPE", 31, QuadPlane, frame_type, 1),
 
@@ -409,6 +409,40 @@ const AP_Param::GroupInfo QuadPlane::var_info2[] = {
     // @Bitmask: 0:Motor 1,1:Motor 2,2:Motor 3,3:Motor 4, 4:Motor 5,5:Motor 6,6:Motor 7,7:Motor 8
     AP_GROUPINFO("TAILSIT_MOTMX", 9, QuadPlane, tailsitter.motor_mask, 0),
 
+    // @Param: THROTTLE_EXPO
+    // @DisplayName: Throttle expo strength
+    // @Description: Amount of curvature in throttle curve: 0 is linear, 1 is cubic
+    // @Range: 0 1
+    // @Increment: .1
+    // @User: Advanced
+    AP_GROUPINFO("THROTTLE_EXPO", 10, QuadPlane, throttle_expo, 0.2),
+
+    // @Param: ACRO_RLL_RATE
+    // @DisplayName: QACRO mode roll rate
+    // @Description: The maximum roll rate at full stick deflection in QACRO mode
+    // @Units: deg/s
+    // @Range: 10 500
+    // @Increment: 1
+    // @User: Standard
+    AP_GROUPINFO("ACRO_RLL_RATE", 11, QuadPlane, acro_roll_rate, 360),
+
+    // @Param: ACRO_PIT_RATE
+    // @DisplayName: QACRO mode pitch rate
+    // @Description: The maximum pitch rate at full stick deflection in QACRO mode
+    // @Units: deg/s
+    // @Range: 10 500
+    // @Increment: 1
+    // @User: Standard
+    AP_GROUPINFO("ACRO_PIT_RATE", 12, QuadPlane, acro_pitch_rate, 180),
+
+    // @Param: ACRO_YAW_RATE
+    // @DisplayName: QACRO mode yaw rate
+    // @Description: The maximum yaw rate at full stick deflection in QACRO mode
+    // @Units: deg/s
+    // @Range: 10 500
+    // @Increment: 1
+    // @User: Standard
+    AP_GROUPINFO("ACRO_YAW_RATE", 13, QuadPlane, acro_yaw_rate, 90),
     AP_GROUPEND
 };
 
@@ -599,7 +633,7 @@ bool QuadPlane::setup(void)
         motors = new AP_MotorsMatrixTS(plane.scheduler.get_loop_rate_hz(), rc_speed);
         motors_var_info = AP_MotorsMatrixTS::var_info;
     }
-    
+
     const static char *strUnableToAllocate = "Unable to allocate";
     if (!motors) {
         hal.console->printf("%s motors\n", strUnableToAllocate);
@@ -656,10 +690,14 @@ bool QuadPlane::setup(void)
 
     transition_state = TRANSITION_DONE;
 
-    if (tilt.tilt_mask != 0 && tilt.tilt_type == TILT_TYPE_VECTORED_YAW) {
-        // setup tilt servos for vectored yaw
-        SRV_Channels::set_range(SRV_Channel::k_tiltMotorLeft,  1000);
-        SRV_Channels::set_range(SRV_Channel::k_tiltMotorRight, 1000);
+    if (tilt.tilt_mask != 0) {
+        // setup tilt compensation
+        motors->set_thrust_compensation_callback(FUNCTOR_BIND_MEMBER(&QuadPlane::tilt_compensate, void, float *, uint8_t));
+        if (tilt.tilt_type == TILT_TYPE_VECTORED_YAW) {
+            // setup tilt servos for vectored yaw
+            SRV_Channels::set_range(SRV_Channel::k_tiltMotorLeft,  1000);
+            SRV_Channels::set_range(SRV_Channel::k_tiltMotorRight, 1000);
+        }
     }
 
     
@@ -737,7 +775,8 @@ void QuadPlane::multicopter_attitude_rate_update(float yaw_rate_cds)
 {
     check_attitude_relax();
 
-    if (in_vtol_mode() || is_tailsitter()) {
+    // tailsitter-only bodyframe roll control options
+    if (is_tailsitter()) {
         if (tailsitter.input_type == TAILSITTER_INPUT_BF_ROLL_M) {
             // Angle mode attitude control for pitch and body-frame roll, rate control for yaw.
             // this version interprets the first argument as yaw rate and the third as roll angle
@@ -747,16 +786,21 @@ void QuadPlane::multicopter_attitude_rate_update(float yaw_rate_cds)
             attitude_control->input_euler_rate_yaw_euler_angle_pitch_bf_roll_m(plane.nav_roll_cd,
                                                                                plane.nav_pitch_cd,
                                                                                yaw_rate_cds);
+            return;
         } else if (tailsitter.input_type == TAILSITTER_INPUT_BF_ROLL_P) {
             attitude_control->input_euler_rate_yaw_euler_angle_pitch_bf_roll_p(plane.nav_roll_cd,
                                                                                plane.nav_pitch_cd,
                                                                                yaw_rate_cds);
-        } else {
-            // use euler angle attitude control
-            attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(plane.nav_roll_cd,
-                                                                          plane.nav_pitch_cd,
-                                                                          yaw_rate_cds);
+            return;
         }
+    }
+
+    // normal control modes for VTOL and FW flight
+    if (in_vtol_mode() || is_tailsitter()) {
+        // use euler angle attitude control
+        attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(plane.nav_roll_cd,
+                                                                      plane.nav_pitch_cd,
+                                                                      yaw_rate_cds);
     } else {
         // use the fixed wing desired rates
         float roll_rate = plane.rollController.get_pid_info().desired;
@@ -794,7 +838,7 @@ void QuadPlane::control_stabilize(void)
     }
 
     // normal QSTABILIZE mode
-    float pilot_throttle_scaled = plane.get_throttle_input() / 100.0f;
+    float pilot_throttle_scaled = get_pilot_throttle();
     hold_stabilize(pilot_throttle_scaled);
 
 }
@@ -904,6 +948,22 @@ void QuadPlane::hold_hover(float target_climb_rate)
     run_z_controller();
 }
 
+float QuadPlane::get_pilot_throttle()
+{
+    // get scaled throttle input
+    float throttle_in = plane.channel_throttle->get_control_in();
+
+    // normalize to [0,1]
+    throttle_in /= plane.channel_throttle->get_range();
+
+    // get hover throttle level [0,1]
+    float thr_mid = motors->get_throttle_hover();
+    float thrust_curve_expo = constrain_float(throttle_expo, 0.0f, 1.0f);
+
+    // this puts mid stick at hover throttle
+    return throttle_curve(thr_mid, thrust_curve_expo, throttle_in);;
+}
+
 /*
   control QACRO mode
  */
@@ -920,42 +980,19 @@ void QuadPlane::control_qacro(void)
 
         // convert the input to the desired body frame rate
         float target_roll = 0;
-        float target_pitch = plane.channel_pitch->norm_input() * plane.g.acro_pitch_rate * 100.0f;
+        float target_pitch = plane.channel_pitch->norm_input() * acro_pitch_rate * 100.0f;
         float target_yaw = 0;
         if (is_tailsitter()) {
             // Note that the 90 degree Y rotation for copter mode swaps body-frame roll and yaw
             // acro_roll_rate param applies to yaw in copter frame
-            // no parameter for acro yaw rate; just use the normal one since the default is 100 deg/sec
-            target_roll =  plane.channel_rudder->norm_input() * yaw_rate_max * 100.0f;
-            target_yaw  = -plane.channel_roll->norm_input() * plane.g.acro_roll_rate * 100.0f;
+            target_roll =  plane.channel_rudder->norm_input() * acro_roll_rate * 100.0f;
+            target_yaw  = -plane.channel_roll->norm_input() * acro_yaw_rate * 100.0f;
         } else {
-            target_roll = plane.channel_roll->norm_input() * plane.g.acro_roll_rate * 100.0f;
-            target_yaw  = plane.channel_rudder->norm_input() * yaw_rate_max * 100.0;
+            target_roll = plane.channel_roll->norm_input() * acro_roll_rate * 100.0f;
+            target_yaw  = plane.channel_rudder->norm_input() * acro_yaw_rate * 100.0;
         }
 
-        // get pilot's desired throttle
-        int16_t mid_stick = plane.channel_throttle->get_control_mid();
-        // protect against unlikely divide by zero
-        if (mid_stick <= 0) {
-            mid_stick = 50;
-        }
-        float thr_mid = motors->get_throttle_hover();
-        int16_t throttle_control = plane.channel_throttle->get_control_in();
-        float throttle_in;
-        if (throttle_control < mid_stick) {
-            // below the deadband
-            throttle_in = ((float)throttle_control) * 0.5f / (float)mid_stick;
-        } else if (throttle_control > mid_stick) {
-            // above the deadband
-            throttle_in = 0.5f + ((float)(throttle_control - mid_stick)) * 0.5f / (float)(100 - mid_stick);
-        } else {
-            // must be in the deadband
-            throttle_in = 0.5f;
-        }
-
-        float expo = constrain_float(-(thr_mid - 0.5) / 0.375, -0.5f, 1.0f);
-        // calculate the output throttle using the given expo function
-        float throttle_out = throttle_in*(1.0f-expo) + expo*throttle_in*throttle_in*throttle_in;
+        float throttle_out = get_pilot_throttle();
 
         // run attitude controller
         if (plane.g.acro_locking) {
@@ -1756,6 +1793,11 @@ void QuadPlane::update_throttle_hover()
         return;
     }
 
+    // do not update if quadplane forward motor is running (wing may be generating lift)
+    if (!is_tailsitter() && (SRV_Channels::get_output_scaled(SRV_Channel::k_throttle) != 0)) {
+        return;
+    }
+
     // get throttle output
     float throttle = motors->get_throttle();
 
@@ -1831,9 +1873,7 @@ void QuadPlane::control_run(void)
     switch (plane.control_mode->mode_number()) {
     case Mode::Number::QACRO:
         control_qacro();
-        // QACRO uses only the multicopter controller
-        // so skip the Plane attitude control calls below
-        return;
+        break;
     case Mode::Number::QSTABILIZE:
         control_stabilize();
         break;
@@ -1855,10 +1895,15 @@ void QuadPlane::control_run(void)
     default:
         break;
     }
+
     // we also stabilize using fixed wing surfaces
     float speed_scaler = plane.get_speed_scaler();
-    plane.stabilize_roll(speed_scaler);
-    plane.stabilize_pitch(speed_scaler);
+    if (plane.control_mode->mode_number() == Mode::Number::QACRO) {
+        plane.stabilize_acro(speed_scaler);
+    } else {
+        plane.stabilize_roll(speed_scaler);
+        plane.stabilize_pitch(speed_scaler);
+    }
 }
 
 /*
@@ -2169,8 +2214,7 @@ void QuadPlane::vtol_position_controller(void)
             float target_altitude = plane.next_WP_loc.alt;
             if (poscontrol.slow_descent) {
                 // gradually descend as we approach target
-                plane.auto_state.wp_proportion = location_path_proportion(plane.current_loc, 
-                                                                          plane.prev_WP_loc, plane.next_WP_loc);
+                plane.auto_state.wp_proportion = plane.current_loc.line_path_proportion(plane.prev_WP_loc, plane.next_WP_loc);
                 target_altitude = linear_interpolate(plane.prev_WP_loc.alt,
                                                      plane.next_WP_loc.alt,
                                                      plane.auto_state.wp_proportion,
@@ -2499,7 +2543,7 @@ void QuadPlane::check_land_complete(void)
         return;
     }
     if (land_detector(4000)) {
-        plane.disarm_motors();
+        plane.arming.disarm();
         poscontrol.state = QPOS_LAND_COMPLETE;
         gcs().send_text(MAV_SEVERITY_INFO,"Land complete");
         // reload target airspeed which could have been modified by the mission

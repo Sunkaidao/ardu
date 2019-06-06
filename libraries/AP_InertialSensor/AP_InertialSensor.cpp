@@ -33,6 +33,10 @@
 #define timing_printf(fmt, args...)
 #endif
 
+#ifndef HAL_DEFAULT_INS_FAST_SAMPLE
+#define HAL_DEFAULT_INS_FAST_SAMPLE 0
+#endif
+
 extern const AP_HAL::HAL& hal;
 
 #if APM_BUILD_TYPE(APM_BUILD_ArduCopter)
@@ -256,7 +260,7 @@ const AP_Param::GroupInfo AP_InertialSensor::var_info[] = {
     // @DisplayName: Gyro filter cutoff frequency
     // @Description: Filter cutoff frequency for gyroscopes. This can be set to a lower value to try to cope with very high vibration levels in aircraft. This option takes effect on the next reboot. A value of zero means no filtering (not recommended!)
     // @Units: Hz
-    // @Range: 0 127
+    // @Range: 0 256
     // @User: Advanced
     AP_GROUPINFO("GYRO_FILTER", 18, AP_InertialSensor, _gyro_filter_cutoff,  DEFAULT_GYRO_FILTER),
 
@@ -264,7 +268,7 @@ const AP_Param::GroupInfo AP_InertialSensor::var_info[] = {
     // @DisplayName: Accel filter cutoff frequency
     // @Description: Filter cutoff frequency for accelerometers. This can be set to a lower value to try to cope with very high vibration levels in aircraft. This option takes effect on the next reboot. A value of zero means no filtering (not recommended!)
     // @Units: Hz
-    // @Range: 0 127
+    // @Range: 0 256
     // @User: Advanced
     AP_GROUPINFO("ACCEL_FILTER", 19, AP_InertialSensor, _accel_filter_cutoff,  DEFAULT_ACCEL_FILTER),
 
@@ -431,11 +435,11 @@ const AP_Param::GroupInfo AP_InertialSensor::var_info[] = {
     // @User: Advanced
     // @Values: 1:FirstIMUOnly,3:FirstAndSecondIMU
     // @Bitmask: 0:FirstIMU,1:SecondIMU,2:ThirdIMU
-    AP_GROUPINFO("FAST_SAMPLE",  36, AP_InertialSensor, _fast_sampling_mask,   0),
+    AP_GROUPINFO("FAST_SAMPLE",  36, AP_InertialSensor, _fast_sampling_mask,   HAL_DEFAULT_INS_FAST_SAMPLE),
 
     // @Group: NOTCH_
     // @Path: ../Filter/NotchFilter.cpp
-    AP_SUBGROUPINFO(_notch_filter, "NOTCH_",  37, AP_InertialSensor, NotchFilterVector3fParam),
+    AP_SUBGROUPINFO(_notch_filter, "NOTCH_",  37, AP_InertialSensor, NotchFilterParams),
 
     // @Group: LOG_
     // @Path: ../AP_InertialSensor/BatchSampler.cpp
@@ -642,8 +646,6 @@ AP_InertialSensor::init(uint16_t sample_rate)
 
     _sample_period_usec = 1000*1000UL / _sample_rate;
 
-    _notch_filter.init(sample_rate);
-    
     // establish the baseline time between samples
     _delta_time = 0;
     _next_sample_usec = 0;
@@ -697,7 +699,10 @@ AP_InertialSensor::detect_backends(void)
         ADD_BACKEND(AP_InertialSensor_HIL::detect(*this));
         return;
     }
-#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+#if defined(HAL_INS_PROBE_LIST)
+    // IMUs defined by IMU lines in hwdef.dat
+    HAL_INS_PROBE_LIST;
+#elif CONFIG_HAL_BOARD == HAL_BOARD_SITL
     ADD_BACKEND(AP_InertialSensor_SITL::detect(*this));
 #elif HAL_INS_DEFAULT == HAL_INS_HIL
     ADD_BACKEND(AP_InertialSensor_HIL::detect(*this));
@@ -769,13 +774,6 @@ AP_InertialSensor::detect_backends(void)
         ADD_BACKEND(AP_InertialSensor_Invensense::probe(*this, hal.spi->get_device(HAL_INS_MPU9250_NAME), ROTATION_NONE));
         break;
         
-    case AP_BoardConfig::PX4_BOARD_PIXRACER:
-        // only do fast samplng on ICM-20608. The MPU9250 doesn't handle high rate well when it has a mag enabled
-        _fast_sampling_mask.set_default(1);
-        ADD_BACKEND(AP_InertialSensor_Invensense::probe(*this, hal.spi->get_device(HAL_INS_ICM20608_NAME), ROTATION_ROLL_180_YAW_90));
-        ADD_BACKEND(AP_InertialSensor_Invensense::probe(*this, hal.spi->get_device(HAL_INS_MPU9250_NAME), ROTATION_ROLL_180_YAW_90));
-        break;
-
     case AP_BoardConfig::PX4_BOARD_PIXHAWK_PRO:
         _fast_sampling_mask.set_default(3);
         ADD_BACKEND(AP_InertialSensor_Invensense::probe(*this, hal.spi->get_device(HAL_INS_ICM20608_NAME), ROTATION_ROLL_180_YAW_90));
@@ -878,8 +876,6 @@ AP_InertialSensor::detect_backends(void)
 #else
     #error Unrecognised HAL_INS_TYPE setting
 #endif
-
-    _enable_mask.set(found_mask);
 
     if (_backend_count == 0) {
         AP_BoardConfig::sensor_config_error("INS: unable to initialise driver");
@@ -1117,6 +1113,8 @@ AP_InertialSensor::_init_gyro()
     // cold start
     hal.console->printf("Init Gyro");
 
+    EXPECT_DELAY_MS(60000);
+
     /*
       we do the gyro calibration with no board rotation. This avoids
       having to rotate readings during the calibration
@@ -1339,9 +1337,6 @@ void AP_InertialSensor::update(void)
         }
     }
 
-    // apply notch filter to primary gyro
-    _gyro[_primary_gyro] = _notch_filter.apply(_gyro[_primary_gyro]);
-    
     _last_update_usec = AP_HAL::micros();
     
     _have_sample = false;
@@ -1695,6 +1690,7 @@ void AP_InertialSensor::acal_update()
         return;
     }
 
+    EXPECT_DELAY_MS(20000);
     _acal->update();
 
     if (hal.util->get_soft_armed() && _acal->get_status() != ACCEL_CAL_NOT_STARTED) {
@@ -1856,6 +1852,7 @@ MAV_RESULT AP_InertialSensor::simple_accel_cal()
         return MAV_RESULT_TEMPORARILY_REJECTED;
     }
 
+    EXPECT_DELAY_MS(20000);
     // record we are calibrating
     _calibrating = true;
 
@@ -1996,6 +1993,17 @@ MAV_RESULT AP_InertialSensor::simple_accel_cal()
     AP_Notify::flags.initialising = false;
 
     return result;
+}
+
+/*
+  see if gyro calibration should be performed
+ */
+AP_InertialSensor::Gyro_Calibration_Timing AP_InertialSensor::gyro_calibration_timing()
+{
+    if (hal.util->was_watchdog_reset()) {
+        return GYRO_CAL_NEVER;
+    }
+    return (Gyro_Calibration_Timing)_gyro_cal_timing.get();
 }
 
 

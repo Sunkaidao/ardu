@@ -219,9 +219,6 @@ const AP_Param::GroupInfo AP_Airspeed::var_info[] = {
 
 AP_Airspeed::AP_Airspeed()
 {
-    for (uint8_t i=0; i<AIRSPEED_MAX_SENSORS; i++) {
-        state[i].EAS2TAS = 1;
-    }
     AP_Param::setup_object_defaults(this, var_info);
 
     if (_singleton != nullptr) {
@@ -319,6 +316,10 @@ bool AP_Airspeed::get_temperature(uint8_t i, float &temperature)
 // least once before the get_airspeed() interface can be used
 void AP_Airspeed::calibrate(bool in_startup)
 {
+    if (hal.util->was_watchdog_reset()) {
+        gcs().send_text(MAV_SEVERITY_INFO,"Airspeed: skipping cal");
+        return;
+    }
     for (uint8_t i=0; i<AIRSPEED_MAX_SENSORS; i++) {
         if (!enabled(i)) {
             continue;

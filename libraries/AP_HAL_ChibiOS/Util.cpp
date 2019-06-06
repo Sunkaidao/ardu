@@ -21,6 +21,7 @@
 #include <ch.h>
 #include "RCOutput.h"
 #include "hwdef/common/stm32_util.h"
+#include "hwdef/common/watchdog.h"
 #include "hwdef/common/flash.h"
 #include <AP_ROMFS/AP_ROMFS.h>
 #include "sdcard.h"
@@ -229,6 +230,8 @@ bool Util::flash_bootloader()
     uint32_t fw_size;
     const char *fw_name = "bootloader.bin";
 
+    EXPECT_DELAY_MS(11000);
+
     uint8_t *fw = AP_ROMFS::find_decompress(fw_name, fw_size);
     if (!fw) {
         hal.console->printf("failed to find %s\n", fw_name);
@@ -251,9 +254,7 @@ bool Util::flash_bootloader()
     hal.console->printf("Flashing %s @%08x\n", fw_name, (unsigned int)addr);
     const uint8_t max_attempts = 10;
     for (uint8_t i=0; i<max_attempts; i++) {
-        void *context = hal.scheduler->disable_interrupts_save();
         bool ok = hal.flash->write(addr, fw, fw_size);
-        hal.scheduler->restore_interrupts(context);
         if (!ok) {
             hal.console->printf("Flash failed! (attempt=%u/%u)\n",
                                 i+1,
@@ -310,3 +311,9 @@ bool Util::fs_init(void)
     return sdcard_retry();
 }
 #endif
+
+// return true if the reason for the reboot was a watchdog reset
+bool Util::was_watchdog_reset() const
+{
+    return stm32_was_watchdog_reset();
+}

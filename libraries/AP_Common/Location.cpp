@@ -102,6 +102,11 @@ Location::AltFrame Location::get_alt_frame() const
 /// get altitude in desired frame
 bool Location::get_alt_cm(AltFrame desired_frame, int32_t &ret_alt_cm) const
 {
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+    if (lat == 0 && lng == 0) {
+        AP_HAL::panic("Should not be called on invalid location");
+    }
+#endif
     Location::AltFrame frame = get_alt_frame();
 
     // shortcut if desired and underlying frame are the same
@@ -327,4 +332,32 @@ bool Location::same_latlon_as(const Location &loc2) const
 bool Location::check_latlng() const
 {
     return check_lat(lat) && check_lng(lng);
+}
+
+// see if location is past a line perpendicular to
+// the line between point1 and point2 and passing through point2.
+// If point1 is our previous waypoint and point2 is our target waypoint
+// then this function returns true if we have flown past
+// the target waypoint
+bool Location::past_interval_finish_line(const Location &point1, const Location &point2) const
+{
+    return this->line_path_proportion(point1, point2) >= 1.0f;
+}
+
+/*
+  return the proportion we are along the path from point1 to
+  point2, along a line parallel to point1<->point2.
+
+  This will be more than 1 if we have passed point2
+ */
+float Location::line_path_proportion(const Location &point1, const Location &point2) const
+{
+    const Vector2f vec1 = point1.get_distance_NE(point2);
+    const Vector2f vec2 = point1.get_distance_NE(*this);
+    const float dsquared = sq(vec1.x) + sq(vec1.y);
+    if (dsquared < 0.001f) {
+        // the two points are very close together
+        return 1.0f;
+    }
+    return (vec1 * vec2) / dsquared;
 }

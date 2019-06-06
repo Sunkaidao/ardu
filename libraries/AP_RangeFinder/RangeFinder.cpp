@@ -35,8 +35,10 @@
 #include "AP_RangeFinder_NMEA.h"
 #include "AP_RangeFinder_Wasp.h"
 #include "AP_RangeFinder_Benewake.h"
+#include "AP_RangeFinder_Benewake_TFMiniPlus.h"
 #include "AP_RangeFinder_PWM.h"
 #include "AP_RangeFinder_BLPing.h"
+#include "AP_RangeFinder_UAVCAN.h"
 #include <AP_BoardConfig/AP_BoardConfig.h>
 #include <AP_Vehicle/AP_Vehicle_Type.h>
 
@@ -413,6 +415,14 @@ void RangeFinder::detect_instance(uint8_t instance, uint8_t& serial_instance)
                 }
             }
         break;
+    case RangeFinder_TYPE_BenewakeTFminiPlus:
+        FOREACH_I2C(i) {
+            if (_add_backend(AP_RangeFinder_Benewake_TFMiniPlus::detect(state[instance], params[instance],
+                                                                        hal.i2c_mgr->get_device(i, params[instance].address)))) {
+                break;
+            }
+        }
+        break;
 #if CONFIG_HAL_BOARD == HAL_BOARD_CHIBIOS
     case RangeFinder_TYPE_PX4_PWM:
         // to ease moving from PX4 to ChibiOS we'll lie a little about
@@ -665,23 +675,22 @@ void RangeFinder::Log_RFND()
         return;
     }
 
-    const AP_RangeFinder_Backend *s0 = get_backend(0);
-    const AP_RangeFinder_Backend *s1 = get_backend(1);
-    if (s0 == nullptr && s1 == nullptr) {
-        return;
-    }
+    for (uint8_t i=0; i<RANGEFINDER_MAX_INSTANCES; i++) {
+        const AP_RangeFinder_Backend *s = get_backend(i);
+        if (s == nullptr) {
+            continue;
+        }
 
-    struct log_RFND pkt = {
-        LOG_PACKET_HEADER_INIT((uint8_t)(LOG_RFND_MSG)),
-        time_us       : AP_HAL::micros64(),
-        dist1         : s0 ? s0->distance_cm() : (uint16_t)0,
-        status1       : s0 ? (uint8_t)s0->status() : (uint8_t)0,
-        orient1       : s0 ? s0->orientation() : ROTATION_NONE,
-        dist2         : s1 ? s1->distance_cm() : (uint16_t)0,
-        status2       : s1 ? (uint8_t)s1->status() : (uint8_t)0,
-        orient2       : s1 ? s1->orientation() : ROTATION_NONE,
-    };
-    AP::logger().WriteBlock(&pkt, sizeof(pkt));
+        const struct log_RFND pkt = {
+                LOG_PACKET_HEADER_INIT(LOG_RFND_MSG),
+                time_us      : AP_HAL::micros64(),
+                instance     : i,
+                dist         : s->distance_cm(),
+                status       : (uint8_t)s->status(),
+                orient       : s->orientation(),
+        };
+        AP::logger().WriteBlock(&pkt, sizeof(pkt));
+    }
 }
 
 RangeFinder *RangeFinder::_singleton;

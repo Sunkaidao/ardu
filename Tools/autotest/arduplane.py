@@ -56,8 +56,11 @@ class AutoTestPlane(AutoTest):
     def set_autodisarm_delay(self, delay):
         self.set_parameter("LAND_DISARMDELAY", delay)
 
-    def takeoff(self):
-        """Takeoff get to 30m altitude."""
+    def takeoff(self, alt=150, alt_max=None, relative=True):
+        """Takeoff to altitude."""
+
+        if alt_max is None:
+            alt_max = alt + 30
 
         self.mavproxy.send('switch 4\n')
         self.wait_mode('FBWA')
@@ -85,9 +88,7 @@ class AutoTestPlane(AutoTest):
         self.set_rc(3, 2000)
 
         # gain a bit of altitude
-        self.wait_altitude(self.homeloc.alt+150,
-                           self.homeloc.alt+180,
-                           timeout=30)
+        self.wait_altitude(alt, alt_max, timeout=30, relative=relative)
 
         # level off
         self.set_rc(2, 1500)
@@ -501,6 +502,94 @@ class AutoTestPlane(AutoTest):
         self.mavproxy.expect("Auto disarmed")
         self.progress("Mission OK")
 
+    def fly_do_change_speed(self):
+        # the following lines ensure we revert these parameter values
+        # - DO_CHANGE_AIRSPEED is a permanent vehicle change!
+        self.set_parameter("TRIM_ARSPD_CM", self.get_parameter("TRIM_ARSPD_CM"))
+        self.set_parameter("MIN_GNDSPD_CM", self.get_parameter("MIN_GNDSPD_CM"))
+
+        self.progress("Takeoff")
+        self.takeoff(alt=100)
+        self.set_rc(3, 1500)
+        # ensure we know what the airspeed is:
+        self.progress("Entering guided and flying somewhere constant")
+        self.change_mode("GUIDED")
+        self.run_cmd_int(
+            mavutil.mavlink.MAV_CMD_DO_REPOSITION,
+            0,
+            0,
+            0,
+            0,
+            12345, # lat*1e7
+            12345, # lon*1e7
+            100    # alt
+        )
+        self.delay_sim_time(10)
+        self.progress("Ensuring initial speed is known and relatively constant")
+        initial_speed = 21.5;
+        timeout = 10
+        tstart = self.get_sim_time()
+        while True:
+            if self.get_sim_time_cached() - tstart > timeout:
+                break
+            m = self.mav.recv_match(type='VFR_HUD', blocking=True)
+            self.progress("GroundSpeed: %f want=%f" %
+                          (m.groundspeed, initial_speed))
+            if abs(initial_speed - m.groundspeed) > 1:
+                raise NotAchievedException("Initial speed not as expected (want=%f got=%f" % (initial_speed, m.groundspeed))
+
+        self.progress("Setting groundspeed")
+        new_target_groundspeed = initial_speed + 5
+        self.run_cmd(
+            mavutil.mavlink.MAV_CMD_DO_CHANGE_SPEED,
+            1, # groundspeed
+            new_target_groundspeed,
+            -1, # throttle / no change
+            0, # absolute values
+            0,
+            0,
+            0)
+        self.wait_groundspeed(new_target_groundspeed-0.5, new_target_groundspeed+0.5, timeout=40)
+        self.progress("Adding some wind, ensuring groundspeed holds")
+        self.set_parameter("SIM_WIND_SPD", 5)
+        self.delay_sim_time(5)
+        self.wait_groundspeed(new_target_groundspeed-0.5, new_target_groundspeed+0.5, timeout=40)
+        self.set_parameter("SIM_WIND_SPD", 0)
+
+        self.progress("Setting airspeed")
+        new_target_airspeed = initial_speed + 5
+        self.run_cmd(
+            mavutil.mavlink.MAV_CMD_DO_CHANGE_SPEED,
+            0, # airspeed
+            new_target_airspeed,
+            -1, # throttle / no change
+            0, # absolute values
+            0,
+            0,
+            0)
+        self.wait_groundspeed(new_target_airspeed-0.5, new_target_airspeed+0.5)
+        self.progress("Adding some wind, hoping groundspeed increases/decreases")
+        self.set_parameter("SIM_WIND_SPD", 5)
+        self.set_parameter("SIM_WIND_DIR", 270)
+        self.delay_sim_time(5)
+        timeout = 10
+        tstart = self.get_sim_time()
+        while True:
+            if self.get_sim_time_cached() - tstart > timeout:
+                raise NotAchievedException("Did not achieve groundspeed delta")
+            m = self.mav.recv_match(type='VFR_HUD', blocking=True)
+            delta = abs(m.airspeed - m.groundspeed)
+            want_delta = 4
+            self.progress("groundspeed and airspeed should be different (have=%f want=%f)" % (delta, want_delta))
+            if delta > want_delta:
+                break
+        filename = os.path.join(testdir, "flaps.txt")
+        self.progress("Using %s to fly home" % filename)
+        self.load_mission(filename)
+        self.change_mode("AUTO")
+        self.mavproxy.send('wp set 7\n')
+        self.mav.motors_disarmed_wait()
+
     def fly_flaps(self):
         """Test flaps functionality."""
         filename = os.path.join(testdir, "flaps.txt")
@@ -774,6 +863,26 @@ class AutoTestPlane(AutoTest):
         self.disarm_vehicle(force=True)
         self.reboot_sitl()
 
+    def test_parachute_sinkrate(self):
+        self.set_rc(9, 1000)
+        self.set_parameter("CHUTE_ENABLED", 1)
+        self.set_parameter("CHUTE_TYPE", 10)
+        self.set_parameter("SERVO9_FUNCTION", 27)
+        self.set_parameter("SIM_PARA_ENABLE", 1)
+        self.set_parameter("SIM_PARA_PIN", 9)
+
+        self.set_parameter("CHUTE_CRT_SINK", 9)
+
+        self.progress("Takeoff")
+        self.takeoff(alt=300)
+
+        self.progress("Diving")
+        self.set_rc(2, 2000)
+        self.mavproxy.expect("BANG")
+
+        self.disarm_vehicle(force=True)
+        self.reboot_sitl()
+
     def run_subtest(self, desc, func):
         self.start_subtest(desc)
         func()
@@ -916,6 +1025,8 @@ class AutoTestPlane(AutoTest):
 
             ("TestFlaps", "Flaps", self.fly_flaps),
 
+            ("DO_CHANGE_SPEED", "Test mavlink DO_CHANGE_SPEED command", self.fly_do_change_speed),
+
             ("MainFlight",
              "Lots of things in one flight",
              self.test_main_flight),
@@ -925,6 +1036,8 @@ class AutoTestPlane(AutoTest):
              self.test_gripper_mission),
 
             ("Parachute", "Test Parachute", self.test_parachute),
+
+            ("ParachuteSinkRate", "Test Parachute (SinkRate triggering)", self.test_parachute_sinkrate),
 
             ("AIRSPEED_AUTOCAL", "Test AIRSPEED_AUTOCAL", self.airspeed_autocal),
 

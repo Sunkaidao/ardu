@@ -12,10 +12,16 @@
 // rtl_init - initialise rtl controller
 bool Copter::ModeRTL::init(bool ignore_checks)
 {
+    if (!ignore_checks) {
+        if (!AP::ahrs().home_is_set()) {
+            return false;
+        }
+    }
     // initialise waypoint and spline controller
     wp_nav->wp_and_spline_init();
-    build_path(!copter.failsafe.terrain);
-    climb_start();
+    _state = RTL_Starting;
+    _state_complete = true; // see run() method below
+    terrain_following_allowed = !copter.failsafe.terrain;
     return true;
 }
 
@@ -24,8 +30,9 @@ void Copter::ModeRTL::restart_without_terrain()
 {
     AP::logger().Write_Error(LogErrorSubsystem::NAVIGATION, LogErrorCode::RESTARTED_RTL);
     if (rtl_path.terrain_used) {
-        build_path(false);
-        climb_start();
+        terrain_following_allowed = false;
+        _state = RTL_Starting;
+        _state_complete = true;
         gcs().send_text(MAV_SEVERITY_CRITICAL,"Restarting RTL - Terrain data missing");
     }
 }
@@ -34,9 +41,17 @@ void Copter::ModeRTL::restart_without_terrain()
 // should be called at 100hz or more
 void Copter::ModeRTL::run(bool disarm_on_land)
 {
+    if (!motors->armed()) {
+        return;
+    }
+
     // check if we need to move to next state
     if (_state_complete) {
         switch (_state) {
+        case RTL_Starting:
+            build_path();
+            climb_start();
+            break;
         case RTL_InitialClimb:
             return_start();
             break;
@@ -61,6 +76,11 @@ void Copter::ModeRTL::run(bool disarm_on_land)
 
     // call the correct run function
     switch (_state) {
+
+    case RTL_Starting:
+        // should not be reached:
+        _state = RTL_InitialClimb;
+        FALLTHROUGH;
 
     case RTL_InitialClimb:
         climb_return_run();
@@ -358,7 +378,7 @@ void Copter::ModeRTL::land_run(bool disarm_on_land)
 
     // disarm when the landing detector says we've landed
     if (disarm_on_land && ap.land_complete && motors->get_spool_state() == AP_Motors::SpoolState::GROUND_IDLE) {
-        copter.init_disarm_motors();
+        copter.arming.disarm();
     }
 
     // if not armed set throttle to zero and exit immediately
@@ -375,7 +395,7 @@ void Copter::ModeRTL::land_run(bool disarm_on_land)
     land_run_vertical_control();
 }
 
-void Copter::ModeRTL::build_path(bool terrain_following_allowed)
+void Copter::ModeRTL::build_path()
 {
     // origin point is our stopping point
     Vector3f stopping_point;
@@ -385,7 +405,7 @@ void Copter::ModeRTL::build_path(bool terrain_following_allowed)
     rtl_path.origin_point.change_alt_frame(Location::AltFrame::ABOVE_HOME);
 
     // compute return target
-    compute_return_target(terrain_following_allowed);
+    compute_return_target();
 
     // climb target is above our origin point at the return altitude
     rtl_path.climb_target = Location(rtl_path.origin_point.lat, rtl_path.origin_point.lng, rtl_path.return_target.alt, rtl_path.return_target.get_alt_frame());
@@ -400,7 +420,7 @@ void Copter::ModeRTL::build_path(bool terrain_following_allowed)
 // compute the return target - home or rally point
 //   return altitude in cm above home at which vehicle should return home
 //   return target's altitude is updated to a higher altitude that the vehicle can safely return at (frame may also be set)
-void Copter::ModeRTL::compute_return_target(bool terrain_following_allowed)
+void Copter::ModeRTL::compute_return_target()
 {
     // set return target to nearest rally point or home position (Note: alt is absolute)
 #if AC_RALLY == ENABLED

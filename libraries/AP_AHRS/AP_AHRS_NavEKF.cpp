@@ -130,6 +130,11 @@ void AP_AHRS_NavEKF::update(bool skip_ins_update)
         // update optional alternative attitude view
         _view->update(skip_ins_update);
     }
+
+#if !HAL_MINIMIZE_FEATURES && AP_AHRS_NAVEKF_AVAILABLE
+    // update NMEA output
+    update_nmea_out();
+#endif
 }
 
 void AP_AHRS_NavEKF::update_DCM(bool skip_ins_update)
@@ -188,7 +193,7 @@ void AP_AHRS_NavEKF::update_EKF2(void)
 
             // calculate corrected gyro estimate for get_gyro()
             _gyro_estimate.zero();
-            if (primary_imu == -1) {
+            if (primary_imu == -1 || !_ins.get_gyro_health(primary_imu)) {
                 // the primary IMU is undefined so use an uncorrected default value from the INS library
                 _gyro_estimate = _ins.get_gyro();
             } else {
@@ -261,7 +266,7 @@ void AP_AHRS_NavEKF::update_EKF3(void)
 
             // calculate corrected gyro estimate for get_gyro()
             _gyro_estimate.zero();
-            if (primary_imu == -1) {
+            if (primary_imu == -1 || !_ins.get_gyro_health(primary_imu)) {
                 // the primary IMU is undefined so use an uncorrected default value from the INS library
                 _gyro_estimate = _ins.get_gyro();
             } else {

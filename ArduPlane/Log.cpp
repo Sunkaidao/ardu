@@ -16,11 +16,15 @@ void Plane::Log_Write_Attitude(void)
         //Plane does not have the concept of navyaw. This is a placeholder.
         targets.z = 0;
     }
-    
+
     if (quadplane.tailsitter_active() || quadplane.in_vtol_mode()) {
         // we need the attitude targets from the AC_AttitudeControl controller, as they
-        // account for the acceleration limits
-        targets = quadplane.attitude_control->get_att_target_euler_cd();
+        // account for the acceleration limits.
+        // Also, for bodyframe roll input types, _attitude_target_euler_angle is not maintained
+        // since Euler angles are not used and it is a waste of cpu to compute them at the loop rate.
+        // Get them from the quaternion instead:
+        quadplane.attitude_control->get_attitude_target_quat().to_euler(targets.x, targets.y, targets.z);
+        targets *= degrees(100.0f);
         logger.Write_AttitudeView(*quadplane.ahrs_view, targets);
     } else {
         logger.Write_Attitude(ahrs, targets);
@@ -206,24 +210,6 @@ void Plane::Log_Write_Sonar()
     logger.WriteBlock(&pkt, sizeof(pkt));
 }
 
-struct PACKED log_Arm_Disarm {
-    LOG_PACKET_HEADER;
-    uint64_t time_us;
-    uint8_t  arm_state;
-    uint16_t arm_checks;
-};
-
-void Plane::Log_Arm_Disarm() {
-    struct log_Arm_Disarm pkt = {
-        LOG_PACKET_HEADER_INIT(LOG_ARM_DISARM_MSG),
-        time_us                 : AP_HAL::micros64(),
-        arm_state               : arming.is_armed(),
-        arm_checks              : arming.get_enabled_checks()      
-    };
-    logger.WriteCriticalBlock(&pkt, sizeof(pkt));
-}
-
-
 struct PACKED log_AETR {
     LOG_PACKET_HEADER;
     uint64_t time_us;
@@ -272,8 +258,6 @@ const struct LogStructure Plane::log_structure[] = {
       "NTUN", "QfcccfffLLii",  "TimeUS,Dist,TBrg,NavBrg,AltErr,XT,XTi,AspdE,TLat,TLng,TAlt,TAspd", "smddmmmnDUmn", "F0BBB0B0GGBB" },
     { LOG_SONAR_MSG, sizeof(log_Sonar),             
       "SONR", "QffBf",   "TimeUS,Dist,Volt,Cnt,Corr", "smv--", "FB0--" },
-    { LOG_ARM_DISARM_MSG, sizeof(log_Arm_Disarm),
-      "ARM", "QBH", "TimeUS,ArmState,ArmChecks", "s--", "F--" },
     { LOG_ATRP_MSG, sizeof(AP_AutoTune::log_ATRP),
       "ATRP", "QBBcfff",  "TimeUS,Type,State,Servo,Demanded,Achieved,P", "s---dd-", "F---00-" },
     { LOG_STATUS_MSG, sizeof(log_Status),
@@ -322,7 +306,6 @@ void Plane::Log_Write_Nav_Tuning() {}
 void Plane::Log_Write_Status() {}
 void Plane::Log_Write_Sonar() {}
 
-void Plane::Log_Arm_Disarm() {}
 void Plane::Log_Write_RC(void) {}
 void Plane::Log_Write_Vehicle_Startup_Messages() {}
 
