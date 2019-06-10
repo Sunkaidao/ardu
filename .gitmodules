@@ -1,20 +1,19 @@
 [submodule "modules/uavcan"]
 	path = modules/uavcan
-	url = git://github.com/ArduPilot/uavcan.git
+	url = git@192.168.10.241:liuleilei/uavcan.git
 [submodule "modules/waf"]
 	path = modules/waf
-	url = git://github.com/ArduPilot/waf.git
+	url = git@192.168.10.241:liuleilei/waf.git
 [submodule "modules/gbenchmark"]
 	path = modules/gbenchmark
-	url = git://github.com/google/benchmark.git
+	url = git@192.168.10.241:liuleilei/gbenchmark.git
 [submodule "modules/mavlink"]
 	path = modules/mavlink
-	url = git://github.com/ArduPilot/mavlink
+	url = git@192.168.10.241:liuleilei/mavlink.git
 [submodule "gtest"]
 	path = modules/gtest
-	url = git://github.com/ArduPilot/googletest
+	url = git@192.168.10.241:liuleilei/gtest.git
 [submodule "modules/ChibiOS"]
 	path = modules/ChibiOS
-	url = git://github.com/ArduPilot/ChibiOS.git
+	url = git@192.168.10.241:liuleilei/ChibiOS.git
 
-	
