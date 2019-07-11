@@ -842,7 +842,8 @@ class AutoTestPlane(AutoTest):
             self.mavproxy.expect("Gripper Released")
             self.mavproxy.expect("Auto disarmed")
         except Exception as e:
-            self.progress("Exception caught")
+            self.progress("Exception caught:")
+            self.progress(self.get_exception_stacktrace(e))
             ex = e
         self.context_pop()
         if ex is not None:
@@ -887,13 +888,16 @@ class AutoTestPlane(AutoTest):
     def do_fence_disable(self, want_result=mavutil.mavlink.MAV_RESULT_ACCEPTED):
         self.do_fence_en_or_dis_able(False, want_result=want_result)
 
-    def wait_circling_point_with_radius(self, loc, want_radius, epsilon=2.0, min_circle_time=5):
+    def wait_circling_point_with_radius(self, loc, want_radius, epsilon=5.0, min_circle_time=5, timeout=120):
         on_radius_start_heading = None
         average_radius = 0.0
         circle_time_start = 0
         done_time = False
         done_angle = False
+        tstart = self.get_sim_time()
         while True:
+            if self.get_sim_time() - tstart > timeout:
+                raise AutoTestTimeoutException("Did not get onto circle")
             here = self.mav.location()
             got_radius = self.get_distance(loc, here)
             average_radius = 0.95*average_radius + 0.05*got_radius
@@ -990,7 +994,7 @@ class AutoTestPlane(AutoTest):
         if ex is not None:
             raise ex
 
-    def test_fence_breach_circle_at(self, loc):
+    def test_fence_breach_circle_at(self, loc, disable_on_breach=False):
         ex = None
         try:
             fence_filepath = os.path.join(self.mission_directory(),
@@ -1030,6 +1034,9 @@ class AutoTestPlane(AutoTest):
                 self.assert_fence_sys_status(True, True, False)
                 break
 
+            if disable_on_breach:
+                self.do_fence_disable()
+
             self.wait_circling_point_with_radius(loc, expected_radius)
 
             self.disarm_vehicle(force=True)
@@ -1045,7 +1052,10 @@ class AutoTestPlane(AutoTest):
 
     def test_fence_rtl(self):
         self.progress("Testing FENCE_ACTION_RTL no rally point")
-        self.test_fence_breach_circle_at(self.home_position_as_mav_location())
+        # have to disable the fence once we've breached or we breach
+        # it as part of the loiter-at-home!
+        self.test_fence_breach_circle_at(self.home_position_as_mav_location(),
+                                         disable_on_breach=True)
 
     def location_offset_ne(self, location, north, east):
         print("old: %f %f" % (location.lat, location.lng))
@@ -1192,7 +1202,8 @@ class AutoTestPlane(AutoTest):
                                     blocking=True,
                                     timeout=5)
         except Exception as e:
-            print("Caught exception %s" % str(e))
+            print("Caught exception:")
+            self.progress(self.get_exception_stacktrace(e))
 
         if m is not None:
             raise NotAchievedException("Received unexpected RANGEFINDER msg")
@@ -1229,7 +1240,8 @@ class AutoTestPlane(AutoTest):
                 raise NotAchievedException("No RFND messages in log")
 
         except Exception as e:
-            self.progress("Exception caught: %s" % str(e))
+            self.progress("Exception caught:")
+            self.progress(self.get_exception_stacktrace(e))
             ex = e
         self.context_pop()
         self.reboot_sitl()
@@ -1249,10 +1261,46 @@ class AutoTestPlane(AutoTest):
         self.change_mode("FBWA") # we don't update PIDs in MANUAL
         super(AutoTestPlane, self).test_pid_tuning()
 
+
+    def test_setting_modes_via_auxswitches(self):
+        self.set_parameter("FLTMODE5", 1)
+        self.mavproxy.send('switch 1\n')  # random mode
+        self.wait_heartbeat()
+        self.change_mode('MANUAL')
+        self.mavproxy.send('switch 5\n')  # acro mode
+        self.wait_mode("CIRCLE")
+        self.set_rc(9, 1000)
+        self.set_rc(10, 1000)
+        self.set_parameter("RC9_OPTION", 4) # RTL
+        self.set_parameter("RC10_OPTION", 55) # guided
+        self.set_rc(9, 1900)
+        self.wait_mode("RTL")
+        self.set_rc(10, 1900)
+        self.wait_mode("GUIDED")
+
+        self.progress("resetting both switches - should go back to CIRCLE")
+        self.set_rc(9, 1000)
+        self.set_rc(10, 1000)
+        self.wait_mode("CIRCLE")
+
+        self.set_rc(9, 1900)
+        self.wait_mode("RTL")
+        self.set_rc(10, 1900)
+        self.wait_mode("GUIDED")
+
+        self.progress("Resetting switch should repoll mode switch")
+        self.set_rc(10, 1000) # this re-polls the mode switch
+        self.wait_mode("CIRCLE")
+        self.set_rc(9, 1000)
+
     def tests(self):
         '''return list of all tests'''
         ret = super(AutoTestPlane, self).tests()
         ret.extend([
+
+            ("AuxModeSwitch",
+             "Set modes via auxswitches",
+             self.test_setting_modes_via_auxswitches),
 
             ("TestRCCamera",
              "Test RC Option - Camera Trigger",

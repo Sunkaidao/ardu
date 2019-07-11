@@ -23,10 +23,10 @@
 #include <AP_Param/AP_Param.h>
 #include <GCS_MAVLink/GCS_MAVLink.h>
 #include <AP_NavEKF/AP_Nav_Common.h>
-#include <AP_Baro/AP_Baro.h>
 #include <AP_Airspeed/AP_Airspeed.h>
 #include <AP_Compass/AP_Compass.h>
 #include <AP_RangeFinder/AP_RangeFinder.h>
+#include <AP_Logger/LogStructure.h>
 
 class NavEKF3_core;
 class AP_AHRS;
@@ -359,6 +359,17 @@ public:
     // get timing statistics structure
     void getTimingStatistics(int8_t instance, struct ekf_timing &timing) const;
 
+    /*
+      check if switching lanes will reduce the normalised
+      innovations. This is called when the vehicle code is about to
+      trigger an EKF failsafe, and it would like to avoid that by
+      using a different EKF lane
+     */
+    void checkLaneSwitch(void);
+
+    // write EKF information to on-board logs
+    void Log_Write();
+
 private:
     uint8_t num_cores; // number of allocated cores
     uint8_t primary;   // current primary core
@@ -469,6 +480,9 @@ private:
     // time at start of current filter update
     uint64_t imuSampleTime_us;
 
+    // time of last lane switch
+    uint32_t lastLaneSwitch_ms;
+    
     struct {
         uint32_t last_function_call;  // last time getLastYawYawResetAngle was called
         bool core_changed;            // true when a core change happened and hasn't been consumed, false otherwise
@@ -510,4 +524,15 @@ private:
     // new_primary - index of the ekf instance that we are about to switch to as the primary
     // old_primary - index of the ekf instance that we are currently using as the primary
     void updateLaneSwitchPosDownResetData(uint8_t new_primary, uint8_t old_primary);
+
+    // logging functions shared by cores:
+    void Log_Write_EKF1(uint8_t core, LogMessages msg_id, uint64_t time_us) const;
+    void Log_Write_NKF2a(uint8_t core, LogMessages msg_id, uint64_t time_us) const;
+    void Log_Write_NKF3(uint8_t core, LogMessages msg_id, uint64_t time_us) const;
+    void Log_Write_NKF4(uint8_t core, LogMessages msg_id, uint64_t time_us) const;
+    void Log_Write_NKF5(uint64_t time_us) const;
+    void Log_Write_Quaternion(uint8_t core, LogMessages msg_id, uint64_t time_us) const;
+    void Log_Write_Beacon(uint64_t time_us) const;
+    void Log_Write_BodyOdom(uint64_t time_us) const;
+    void Log_Write_State_Variances(uint64_t time_us) const;
 };

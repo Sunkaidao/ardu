@@ -51,7 +51,7 @@ const AP_Param::GroupInfo RangeFinder::var_info[] = {
 
 	// @Group: 1_
 	// @Path: AP_RangeFinder_Params.cpp
-	AP_SUBGROUPINFO_FLAGS(params[0], "1_", 25, RangeFinder, AP_RangeFinder_Params, AP_PARAM_FLAG_IGNORE_ENABLE),
+	AP_SUBGROUPINFO(params[0], "1_", 25, RangeFinder, AP_RangeFinder_Params),
 
     // @Group: 1_
     // @Path: AP_RangeFinder_Wasp.cpp
@@ -458,7 +458,7 @@ void RangeFinder::detect_instance(uint8_t instance, uint8_t& serial_instance)
      CONFIG_HAL_BOARD_SUBTYPE == HAL_BOARD_SUBTYPE_LINUX_DISCO) && defined(HAVE_LIBIIO)
     case RangeFinder_TYPE_BEBOP:
         if (AP_RangeFinder_Bebop::detect()) {
-            drivers[instance] = new AP_RangeFinder_Bebop(state[instance]);
+            drivers[instance] = new AP_RangeFinder_Bebop(state[instance], params[instance]);
         }
         break;
 #endif

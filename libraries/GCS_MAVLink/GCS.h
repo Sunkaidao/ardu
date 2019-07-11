@@ -7,10 +7,8 @@
 #include <AP_Common/AP_Common.h>
 #include "GCS_MAVLink.h"
 #include <AP_Mission/AP_Mission.h>
-#include <AP_BattMonitor/AP_BattMonitor.h>
 #include <stdint.h>
 #include "MAVLink_routing.h"
-#include <AP_SerialManager/AP_SerialManager.h>
 #include <AP_Avoidance/AP_Avoidance.h>
 #include <AP_Frsky_Telem/AP_Frsky_Telem.h>
 #include <AP_AdvancedFailsafe/AP_AdvancedFailsafe.h>
@@ -44,7 +42,8 @@ enum ap_message : uint8_t {
     MSG_CURRENT_WAYPOINT,
     MSG_VFR_HUD,
     MSG_SERVO_OUTPUT_RAW,
-    MSG_RADIO_IN,
+    MSG_RC_CHANNELS,
+    MSG_RC_CHANNELS_RAW,
     MSG_RAW_IMU,
     MSG_SCALED_IMU,
     MSG_SCALED_IMU2,
@@ -298,7 +297,7 @@ public:
     void        update_receive(uint32_t max_time_us=1000);
     void        update_send();
     void        init(AP_HAL::UARTDriver *port, mavlink_channel_t mav_chan);
-    void        setup_uart(const AP_SerialManager& serial_manager, AP_SerialManager::SerialProtocol protocol, uint8_t instance);
+    void        setup_uart(uint8_t instance);
     void        send_message(enum ap_message id);
     void        send_text(MAV_SEVERITY severity, const char *fmt, ...) const;
     void        send_textv(MAV_SEVERITY severity, const char *fmt, va_list arg_list) const;
@@ -378,7 +377,7 @@ public:
         return GCS_MAVLINK::active_channel_mask() & (1 << (chan-MAVLINK_COMM_0));
     }
     bool is_streaming() const {
-        return GCS_MAVLINK::streaming_channel_mask() & (1 << (chan-MAVLINK_COMM_0));
+        return sending_bucket_id != no_bucket_to_send;
     }
 
     mavlink_channel_t get_chan() const { return chan; }
@@ -397,8 +396,7 @@ public:
     void send_meminfo(void);
     void send_fence_status() const;
     void send_power_status(void);
-    void send_battery_status(const AP_BattMonitor &battery,
-                             const uint8_t instance) const;
+    void send_battery_status(const uint8_t instance) const;
     bool send_battery_status() const;
     void send_distance_sensor() const;
     // send_rangefinder sends only if a downward-facing instance is
@@ -410,7 +408,8 @@ public:
     void send_ahrs2();
     void send_ahrs3();
     void send_system_time();
-    void send_radio_in();
+    void send_rc_channels() const;
+    void send_rc_channels_raw() const;
     void send_raw_imu();
 
     void send_scaled_pressure_instance(uint8_t instance, void (*send_fn)(mavlink_channel_t chan, uint32_t time_boot_ms, float press_abs, float press_diff, int16_t temperature));
@@ -421,9 +420,7 @@ public:
     virtual void send_simstate() const;
     void send_ahrs();
     void send_battery2();
-#if AP_AHRS_NAVEKF_AVAILABLE
     void send_opticalflow();
-#endif
     virtual void send_attitude() const;
     void send_autopilot_version() const;
     void send_extended_sys_state() const;
@@ -622,6 +619,7 @@ protected:
 
     MAV_RESULT handle_command_preflight_can(const mavlink_command_long_t &packet);
 
+    MAV_RESULT handle_command_battery_reset(const mavlink_command_long_t &packet);
     void handle_command_long(mavlink_message_t* msg);
     MAV_RESULT handle_command_accelcal_vehicle_pos(const mavlink_command_long_t &packet);
     virtual MAV_RESULT handle_command_mount(const mavlink_command_long_t &packet);
@@ -807,8 +805,6 @@ private:
     // mavlink routing object
     static MAVLink_routing routing;
 
-    static const AP_SerialManager *serialmanager_p;
-
     struct pending_param_request {
         mavlink_channel_t chan;
         int16_t param_index;
@@ -968,17 +964,19 @@ public:
 
     void update_send();
     void update_receive();
-    virtual void setup_uarts(AP_SerialManager &serial_manager);
+    virtual void setup_uarts();
 
-    bool out_of_time() const {
-        return _out_of_time;
+    // minimum amount of time (in microseconds) that must remain in
+    // the main scheduler loop before we are allowed to send any
+    // mavlink messages.  We want to prioritise the main flight
+    // control loop over communications
+    virtual uint16_t min_loop_time_remaining_for_message_send_us() const {
+        return 200;
     }
-    void set_out_of_time(bool val) {
-        _out_of_time = val;
-    }
+    bool out_of_time() const;
 
     // frsky backend
-    AP_Frsky_Telem frsky;
+    AP_Frsky_Telem *frsky;
 
     // Devo backend
     AP_DEVO_Telem devo_telemetry;
@@ -1027,9 +1025,6 @@ private:
 
     // queue of outgoing statustext messages
     ObjectArray<statustext_t> _statustext_queue{_status_capacity};
-
-    // true if we are running short on time in our main loop
-    bool _out_of_time;
 
     // true if we have already allocated protocol objects:
     bool initialised_missionitemprotocol_objects;
