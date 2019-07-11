@@ -2,11 +2,6 @@
 
 #include "GCS_Mavlink.h"
 
-void Sub::gcs_send_heartbeat()
-{
-    gcs().send_message(MSG_HEARTBEAT);
-}
-
 /*
  *  !!NOTE!!
  *
@@ -224,14 +219,6 @@ bool GCS_Sub::vehicle_initialised() const {
 // try to send a message, return false if it won't fit in the serial tx buffer
 bool GCS_MAVLINK_Sub::try_send_message(enum ap_message id)
 {
-    // if we don't have at least 250 micros remaining before the main loop
-    // wants to fire then don't send a mavlink message. We want to
-    // prioritise the main flight control loop over communications
-    if (sub.scheduler.time_available_usec() < 250 && sub.motors.armed()) {
-        gcs().set_out_of_time(true);
-        return false;
-    }
-
     switch (id) {
 
     case MSG_NAMED_FLOAT:
@@ -356,7 +343,8 @@ static const ap_message STREAM_POSITION_msgs[] = {
 };
 static const ap_message STREAM_RC_CHANNELS_msgs[] = {
     MSG_SERVO_OUTPUT_RAW,
-    MSG_RADIO_IN
+    MSG_RC_CHANNELS,
+    MSG_RC_CHANNELS_RAW, // only sent on a mavlink1 connection
 };
 static const ap_message STREAM_EXTRA1_msgs[] = {
     MSG_ATTITUDE,
@@ -815,7 +803,7 @@ void Sub::mavlink_delay_cb()
     uint32_t tnow = AP_HAL::millis();
     if (tnow - last_1hz > 1000) {
         last_1hz = tnow;
-        gcs_send_heartbeat();
+        gcs().send_message(MSG_HEARTBEAT);
         gcs().send_message(MSG_SYS_STATUS);
     }
     if (tnow - last_50hz > 20) {

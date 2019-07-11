@@ -70,6 +70,7 @@ const struct UnitStructure log_Units[] = {
     { 'v', "V" },             // Volt
     { 'P', "Pa" },            // Pascal
     { 'w', "Ohm" },           // Ohm
+//    { 'W', "Watt" },        // Watt
     { 'Y', "us" },            // pulse width modulation in microseconds
     { 'z', "Hz" },            // Hertz
     { '#', "instance" }       // (e.g.)Sensor instance number
@@ -1109,6 +1110,7 @@ struct PACKED log_Performance {
     uint32_t mem_avail;
     uint16_t load;
     uint32_t internal_errors;
+    uint32_t internal_error_count;
     uint32_t spi_count;
     uint32_t i2c_count;
 };
@@ -1123,6 +1125,16 @@ struct PACKED log_SRTL {
     float N;
     float E;
     float D;
+};
+
+struct PACKED log_OA {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    uint8_t algorithm;
+    int32_t final_lat;
+    int32_t final_lng;
+    int32_t oa_lat;
+    int32_t oa_lng;
 };
 
 struct PACKED log_DSTL {
@@ -1335,9 +1347,11 @@ struct PACKED log_Arm_Disarm {
     { LOG_PROXIMITY_MSG, sizeof(log_Proximity), \
       "PRX", "QBfffffffffff", "TimeUS,Health,D0,D45,D90,D135,D180,D225,D270,D315,DUp,CAn,CDis", "s-mmmmmmmmmhm", "F-BBBBBBBBB00" }, \
     { LOG_PERFORMANCE_MSG, sizeof(log_Performance),                     \
-      "PM",  "QHHIIHIII", "TimeUS,NLon,NLoop,MaxT,Mem,Load,IntErr,SPICnt,I2CCnt", "s---b%--", "F---0A--" }, \
+      "PM",  "QHHIIHIIII", "TimeUS,NLon,NLoop,MaxT,Mem,Load,IntErr,IntErrCnt,SPICnt,I2CCnt", "s---b%----", "F---0A----" }, \
     { LOG_SRTL_MSG, sizeof(log_SRTL), \
-      "SRTL", "QBHHBfff", "TimeUS,Active,NumPts,MaxPts,Action,N,E,D", "s----mmm", "F----000" }
+      "SRTL", "QBHHBfff", "TimeUS,Active,NumPts,MaxPts,Action,N,E,D", "s----mmm", "F----000" }, \
+    { LOG_OA_MSG, sizeof(log_OA), \
+      "OA","QBLLLL","TimeUS,Algo,DLat,DLng,OALat,OALng", "s-----", "F-GGGG" }
 
 // messages for more advanced boards
 #define LOG_EXTRA_STRUCTURES \
@@ -1681,6 +1695,7 @@ enum LogMessages : uint8_t {
     LOG_ERROR_MSG,
     LOG_ADSB_MSG,
     LOG_ARM_DISARM_MSG,
+    LOG_OA_MSG,
 
     _LOG_LAST_MSG_
 };

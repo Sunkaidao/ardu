@@ -77,6 +77,7 @@
 #include <AC_Fence/AC_Fence.h>
 #include <AP_Proximity/AP_Proximity.h>
 #include <AC_Avoidance/AC_Avoid.h>
+#include <AC_Avoidance/AP_OAPathPlanner.h>
 #include <AP_Follow/AP_Follow.h>
 #include <AP_OSD/AP_OSD.h>
 #include <AP_WindVane/AP_WindVane.h>
@@ -229,14 +230,14 @@ private:
     // relay support
     AP_Relay relay;
 
-    AP_ServoRelayEvents ServoRelayEvents{relay};
+    AP_ServoRelayEvents ServoRelayEvents;
 
     // The rover's current location
     struct Location current_loc;
 
     // Camera
 #if CAMERA == ENABLED
-    AP_Camera camera{&relay, MASK_LOG_CAMERA, current_loc, ahrs};
+    AP_Camera camera{MASK_LOG_CAMERA, current_loc};
 #endif
 
     // Camera/Antenna mount tracking and stabilisation stuff
