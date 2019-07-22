@@ -28,6 +28,25 @@ SITL_START_LOCATION = mavutil.location(40.071374969556928,
 
 
 class AutoTestRover(AutoTest):
+    @staticmethod
+    def get_not_armable_mode_list():
+        return []
+
+    @staticmethod
+    def get_not_disarmed_settable_modes_list():
+        return ["FOLLOW"]
+
+    @staticmethod
+    def get_no_position_not_settable_modes_list():
+        return []
+
+    @staticmethod
+    def get_position_armable_modes_list():
+        return ["GUIDED", "LOITER", "STEERING", "AUTO", "RTL", "SMART_RTL"]
+
+    @staticmethod
+    def get_normal_armable_modes_list():
+        return ["ACRO", "HOLD", "MANUAL"]
 
     def log_name(self):
         return "APMrover2"
@@ -46,6 +65,9 @@ class AutoTestRover(AutoTest):
 
     def get_stick_arming_channel(self):
         return int(self.get_parameter("RCMAP_ROLL"))
+
+    def arming_test_mission(self):
+        return os.path.join(testdir, "ArduRover-Missions", "test_arming.txt")
 
     ##########################################################
     #   TESTS DRIVE
@@ -498,9 +520,9 @@ Brakes have negligible effect (with=%0.2fm without=%0.2fm delta=%0.2fm)
             raise ex
 
     def test_servorelayevents(self):
-        self.mavproxy.send("relay set 0 0\n")
+        self.do_set_relay(0, 0)
         off = self.get_parameter("SIM_PIN_MASK")
-        self.mavproxy.send("relay set 0 1\n")
+        self.do_set_relay(0, 1)
         on = self.get_parameter("SIM_PIN_MASK")
         if on == off:
             raise NotAchievedException(

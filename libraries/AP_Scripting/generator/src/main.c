@@ -3,12 +3,13 @@
 #include <stdint.h>
 #include <stdarg.h>
 #include <assert.h>
-#include <readline/readline.h>
 #include <string.h>
 #include <unistd.h>
+#include <getopt.h>
 
 char keyword_alias[]     = "alias";
 char keyword_comment[]   = "--";
+char keyword_enum[]      = "enum";
 char keyword_field[]     = "field";
 char keyword_include[]   = "include";
 char keyword_method[]    = "method";
@@ -52,12 +53,13 @@ struct header {
 };
 
 struct generator_state {
-  char *line;
+  char line[1<<14];
   int line_num; // current line read in
   int token_num; // current token on the current line
   char *token;
 };
 
+FILE *description;
 FILE *header;
 FILE *source;
 
@@ -179,8 +181,10 @@ void error(const int code, const char *message, ...) {
   exit(code);
 }
 
+char *token_delimiters = " \n";
+
 char * next_token(void) {
-  state.token = strtok(NULL, " ");
+  state.token = strtok(NULL, token_delimiters);
   state.token_num++;
   trace(TRACE_TOKENS, "Token %d:%d %s", state.line_num, state.token_num, state.token);
   if ((state.token!= NULL) && (strcmp(state.token, keyword_comment) == 0)) {
@@ -191,14 +195,10 @@ char * next_token(void) {
 }
 
 char * start_line(void) {
-  if (state.line != NULL) {
-    free(state.line);
-  }
-
-  while ((state.line = readline(NULL))) {
+  while (fgets(state.line, sizeof(state.line)/sizeof(state.line[0]), description) != NULL) {//state.line = readline(NULL))) {
       state.line_num++;
     
-      state.token = strtok(state.line, " ");
+      state.token = strtok(state.line, token_delimiters);
       state.token_num = 1;
       trace(TRACE_TOKENS, "Token %d:%d %s", state.line_num, state.token_num, state.token);
 
@@ -288,12 +288,18 @@ enum userdata_flags {
   UD_FLAG_SEMAPHORE = (1U << 0),
 };
 
+struct userdata_enum {
+  struct userdata_enum * next;
+  char * name;     // enum name
+};
+
 struct userdata {
   struct userdata * next;
   char *name;  // name of the C++ singleton
   char *alias; // (optional) used for scripting access
   struct userdata_field *fields;
   struct method *methods;
+  struct userdata_enum *enums;
   enum userdata_type ud_type;
   uint32_t operations; // bitset of enum operation_types
   int flags; // flags from the userdata_flags enum
@@ -499,6 +505,19 @@ int parse_type(struct type *type, const uint32_t restrictions, enum range_check_
   return TRUE;
 }
 
+void handle_userdata_enum(struct userdata *data) {
+  trace(TRACE_USERDATA, "Adding a userdata enum");
+
+  char * enum_name;
+  while ((enum_name = next_token()) != NULL) {
+    trace(TRACE_USERDATA, "Adding enum %s", enum_name);
+    struct userdata_enum *ud_enum = (struct userdata_enum *) allocate(sizeof(struct userdata_enum));
+    ud_enum->next = data->enums;
+    string_copy(&(ud_enum->name), enum_name);
+    data->enums = ud_enum;
+  }
+}
+
 void handle_userdata_field(struct userdata *data) {
   trace(TRACE_USERDATA, "Adding a userdata field");
 
@@ -659,6 +678,8 @@ void handle_userdata(void) {
     handle_operator(node);
   } else if (strcmp(type, keyword_method) == 0) {
     handle_method(node->name, &(node->methods));
+  } else if (strcmp(type, keyword_enum) == 0) {
+    handle_userdata_enum(node);
   } else {
     error(ERROR_USERDATA, "Unknown or unsupported type for userdata: %s", type);
   }
@@ -711,6 +732,8 @@ void handle_singleton(void) {
     node->flags |= UD_FLAG_SEMAPHORE;
   } else if (strcmp(type, keyword_method) == 0) {
     handle_method(node->name, &(node->methods));
+  } else if (strcmp(type, keyword_enum) == 0) {
+    handle_userdata_enum(node);
   } else {
     error(ERROR_SINGLETON, "Singletons only support aliases, methods or semaphore keyowrds (got %s)", type);
   }
@@ -1032,12 +1055,6 @@ void emit_userdata_method(const struct userdata *data, const struct method *meth
   fprintf(source, "static int %s_%s(lua_State *L) {\n", data->name, method->name);
   // emit comments on expected arg/type
   struct argument *arg = method->arguments;
-  while (arg != NULL) {
-    fprintf(source, "    // %d %s %d : %d\n", arg_count++, arg->type.type == TYPE_USERDATA ? arg->type.data.userdata_name :
-                                                                                             arg->type.type == TYPE_ENUM ? arg->type.data.enum_name : type_labels[arg->type.type],
-                                      arg->line_num, arg->token_num);
-    arg = arg->next;
-  }
 
   if (data->ud_type == UD_SINGLETON) {
       // fetch and check the singleton pointer
@@ -1048,7 +1065,6 @@ void emit_userdata_method(const struct userdata *data, const struct method *meth
   }
 
   // sanity check number of args called with
-  arg = method->arguments;
   arg_count = 1;
   while (arg != NULL) {
     if (!(arg->type.flags & TYPE_FLAGS_NULLABLE)) {
@@ -1344,7 +1360,7 @@ void emit_singleton_metatables(void) {
     fprintf(source, "const luaL_Reg %s_meta[] = {\n", node->name);
 
     struct method *method = node->methods;
-    while(method) {
+    while (method) {
       fprintf(source, "    {\"%s\", %s_%s},\n", method->name, node->name, method->name);
       method = method->next;
     }
@@ -1356,28 +1372,51 @@ void emit_singleton_metatables(void) {
   }
 }
 
-void emit_loaders(void) {
-  fprintf(source, "const struct userdata_fun {\n");
-  fprintf(source, "    const char *name;\n");
-  fprintf(source, "    const luaL_Reg *reg;\n");
-  fprintf(source, "} userdata_fun[] = {\n");
-  struct userdata * data = parsed_userdata;
+void emit_enums(struct userdata * data) {
   while (data) {
-    fprintf(source, "    {\"%s\", %s_meta},\n", data->name, data->name);
+    if (data->enums != NULL) {
+      fprintf(source, "struct userdata_enum %s_enums[] = {\n", data->name);
+      struct userdata_enum *ud_enum = data->enums;
+      while (ud_enum != NULL) {
+        fprintf(source, "    {\"%s\", %s::%s},\n", ud_enum->name, data->name, ud_enum->name);
+        ud_enum = ud_enum->next;
+      }
+      fprintf(source, "    {NULL, 0}};\n\n");
+    }
+    data = data->next;
+  }
+}
+
+void emit_metas(struct userdata * data, char * meta_name) {
+  fprintf(source, "const struct userdata_meta %s_fun[] = {\n", meta_name);
+  while (data) {
+    if (data->enums) {
+      fprintf(source, "    {\"%s\", %s_meta, %s_enums},\n", data->alias ? data->alias : data->name, data->name, data->name);
+    } else {
+      fprintf(source, "    {\"%s\", %s_meta, NULL},\n", data->alias ? data->alias : data->name, data->name);
+    }
     data = data->next;
   }
   fprintf(source, "};\n\n");
+}
 
-  fprintf(source, "const struct singleton_fun {\n");
+void emit_loaders(void) {
+  // emit the enum header
+  fprintf(source, "struct userdata_enum {\n");
+  fprintf(source, "    const char *name;\n");
+  fprintf(source, "    int value;\n");
+  fprintf(source, "};\n\n");
+  emit_enums(parsed_userdata);
+  emit_enums(parsed_singletons);
+
+  // emit the meta table header
+  fprintf(source, "struct userdata_meta {\n");
   fprintf(source, "    const char *name;\n");
   fprintf(source, "    const luaL_Reg *reg;\n");
-  fprintf(source, "} singleton_fun[] = {\n");
-  struct userdata * single = parsed_singletons;
-  while (single) {
-    fprintf(source, "    {\"%s\", %s_meta},\n", single->alias ? single->alias : single->name, single->name);
-    single = single->next;
-  }
+  fprintf(source, "    const struct userdata_enum *enums;\n");
   fprintf(source, "};\n\n");
+  emit_metas(parsed_userdata, "userdata");
+  emit_metas(parsed_singletons, "singleton");
 
   fprintf(source, "void load_generated_bindings(lua_State *L) {\n");
   fprintf(source, "    luaL_checkstack(L, 5, \"Out of stack\");\n"); // this is more stack space then we need, but should never fail
@@ -1399,6 +1438,17 @@ void emit_loaders(void) {
   fprintf(source, "        lua_pushstring(L, \"__index\");\n");
   fprintf(source, "        lua_pushvalue(L, -2);\n");
   fprintf(source, "        lua_settable(L, -3);\n");
+
+  fprintf(source, "        if (singleton_fun[i].enums != nullptr) {\n");
+  fprintf(source, "            int j = 0;\n");
+  fprintf(source, "            while (singleton_fun[i].enums[j].name != NULL) {\n");
+  fprintf(source, "                lua_pushstring(L, singleton_fun[i].enums[j].name);\n");
+  fprintf(source, "                lua_pushinteger(L, singleton_fun[i].enums[j].value);\n");
+  fprintf(source, "                lua_settable(L, -3);\n");
+  fprintf(source, "                j++;\n");
+  fprintf(source, "            }\n");
+  fprintf(source, "        }\n");
+
   fprintf(source, "        lua_pop(L, 1);\n");
   fprintf(source, "        lua_newuserdata(L, 0);\n");
   fprintf(source, "        luaL_getmetatable(L, singleton_fun[i].name);\n");
@@ -1475,8 +1525,18 @@ int main(int argc, char **argv) {
   state.line_num = -1;
 
   int c;
-  while ((c = getopt(argc, argv, "o:")) != -1) {
+  while ((c = getopt(argc, argv, "i:o:")) != -1) {
     switch (c) {
+      case 'i':
+        if (description != NULL) {
+          error(ERROR_GENERAL, "Already loaded a description file");
+        }
+        trace(TRACE_GENERAL, "Loading a description file: %s", optarg);
+        description = fopen(optarg, "r");
+        if (description == NULL) {
+          error(ERROR_GENERAL, "Unable to load the description file: %s", optarg);
+        }
+        break;
       case 'o':
         if (output_path != NULL) {
           error(ERROR_GENERAL, "An output path was already selected.");
