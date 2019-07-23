@@ -29,6 +29,7 @@
 #include "AP_GPS_MTK.h"
 #include "AP_GPS_MTK19.h"
 #include "AP_GPS_NMEA.h"
+#include "AP_GPS_NMEA_DA.h"
 #include "AP_GPS_SBF.h"
 #include "AP_GPS_SBP.h"
 #include "AP_GPS_SBP2.h"
@@ -269,6 +270,24 @@ const AP_Param::GroupInfo AP_GPS::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("BLEND_TC", 21, AP_GPS, _blend_tc, 10.0f),
 
+	// @Param: DEC1 
+    // @DisplayName: DGPS heading declination 
+    // @Description: An angle to DGPS between the true north and DGPS north 
+    // @Range: -180 180 
+    // @Units: deg 
+    // @Increment: 0.5 
+    // @User: Standard 
+    AP_GROUPINFO("DEC1", 22, AP_GPS, _declination[0], 0.0f), 
+ 
+    // @Param: DEC2 
+    // @DisplayName: DGPS heading declination 
+    // @Description: An angle to DGPS between the true north and DGPS north 
+    // @Range: -180 180 
+    // @Units: deg 
+    // @Increment: 0.5 
+    // @User: Standard 
+    AP_GROUPINFO("DEC2", 23, AP_GPS, _declination[1], 0.0f),
+
     AP_GROUPEND
 };
 
@@ -423,6 +442,7 @@ void AP_GPS::detect_instance(uint8_t instance)
     const uint32_t now = AP_HAL::millis();
 
     state[instance].status = NO_GPS;
+	state[instance].head_status = NONE; //baiyang added in 20190723
     state[instance].hdop = GPS_UNKNOWN_DOP;
     state[instance].vdop = GPS_UNKNOWN_DOP;
 
@@ -490,7 +510,9 @@ void AP_GPS::detect_instance(uint8_t instance)
         if (_auto_config == GPS_AUTO_CONFIG_ENABLE && new_gps == nullptr) {
             if (_type[instance] == GPS_TYPE_HEMI) {
                 send_blob_start(instance, AP_GPS_NMEA_HEMISPHERE_INIT_STRING, strlen(AP_GPS_NMEA_HEMISPHERE_INIT_STRING));
-            } else {
+            } else if (_type[instance] == GPS_TYPE_HEMI2){
+                send_blob_start(instance, AP_GPS_NMEA_DUAL_ANTENNA_INIT_STRING, strlen(AP_GPS_NMEA_HEMISPHERE_INIT_STRING));
+			} else {
                 send_blob_start(instance, _initialisation_blob, sizeof(_initialisation_blob));
             }
         }
@@ -548,6 +570,9 @@ void AP_GPS::detect_instance(uint8_t instance)
                     _type[instance] == GPS_TYPE_HEMI) &&
                    AP_GPS_NMEA::_detect(dstate->nmea_detect_state, data)) {
             new_gps = new AP_GPS_NMEA(*this, state[instance], _port[instance]);
+        } else if ((_type[instance] == GPS_TYPE_AUTO || _type[instance] == GPS_TYPE_HEMI2) &&
+                   AP_GPS_NMEA_DA::_detect(dstate->nmea_da_detect_state, data)) {
+            new_gps = new AP_GPS_NMEA_DA(*this, state[instance], _port[instance]);
         }
     }
 
@@ -597,6 +622,7 @@ void AP_GPS::update_instance(uint8_t instance)
     if (_type[instance] == GPS_TYPE_NONE) {
         // not enabled
         state[instance].status = NO_GPS;
+		state[instance].head_status = NONE; //baiyang added in 20190723
         state[instance].hdop = GPS_UNKNOWN_DOP;
         state[instance].vdop = GPS_UNKNOWN_DOP;
         return;
@@ -629,8 +655,10 @@ void AP_GPS::update_instance(uint8_t instance)
         if (tnow - timing[instance].last_message_time_ms > GPS_TIMEOUT_MS) {
             memset((void *)&state[instance], 0, sizeof(state[instance]));
             state[instance].instance = instance;
+            state[instance].head_status = NONE; //baiyang added in 20190723
             state[instance].hdop = GPS_UNKNOWN_DOP;
             state[instance].vdop = GPS_UNKNOWN_DOP;
+			state[instance].declination = _declination[instance]; //baiyang added in 20190723
             timing[instance].last_message_time_ms = tnow;
             timing[instance].delta_time_ms = GPS_TIMEOUT_MS;
             // do not try to detect again if type is MAV
@@ -739,7 +767,8 @@ void AP_GPS::update(void)
                     if (i == primary_instance) {
                         continue;
                     }
-                    if (state[i].status > state[primary_instance].status) {
+                    if (state[i].status > state[primary_instance].status || \
+						state[i].head_status > state[primary_instance].head_status) {
                         // we have a higher status lock, or primary is set to the blended GPS, change GPS
                         primary_instance = i;
                         _last_instance_swap_ms = now;
