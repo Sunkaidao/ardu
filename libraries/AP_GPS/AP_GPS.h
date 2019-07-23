@@ -176,6 +176,16 @@ public:
 		float           declination;
     };
 
+
+	//baiyang added in 20170119
+	GPS_Head_Status head_status(uint8_t instance) const {
+        return state[instance].head_status;
+	}
+	GPS_Head_Status head_status(void) const {
+        return head_status(primary_instance);
+    }
+    //added end
+
     /// Startup initialisation.
     void init(const AP_SerialManager& serial_manager);
 
