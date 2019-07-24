@@ -51,6 +51,7 @@ bool NavEKF2_core::setup_core(NavEKF2 *_frontend, uint8_t _imu_index, uint8_t _c
     accel_index_active = _imu_index;
     core_index = _core_index;
     _ahrs = frontend->_ahrs;
+	yawControl = frontend->_yaw_control;
 
     /*
       the imu_buffer_length needs to cope with a 260ms delay at a
@@ -77,6 +78,9 @@ bool NavEKF2_core::setup_core(NavEKF2 *_frontend, uint8_t _imu_index, uint8_t _c
         return false;
     }
     if(!storedOF.init(FLOW_BUFFER_LENGTH)) {
+        return false;
+    }
+	if(!storedYawAng.init(OBS_BUFFER_LENGTH)) {
         return false;
     }
     // Note: the use of dual range finders potentially doubles the amount of to be stored
@@ -308,6 +312,17 @@ void NavEKF2_core::InitialiseVariables()
     extNavUsedForPos = false;
     extNavYawResetRequest = false;
 
+	//baiyang added in 20170117
+	lastTimeGpsHeadReceived_ms = 0;
+	secondLastGpsHeadTime_ms = 0;
+	//added end
+	//baiyang added in 20180829
+	lastTimeGpsHeadLost_ms = 0;
+	prelastTimeGpsHeadReceived_ms = 0;
+	shouldResetYaw = false;
+	//added end
+	isGpsYawFusion = false; //baiyang added in 20190723
+
     // zero data buffers
     storedIMU.reset();
     storedGPS.reset();
@@ -355,6 +370,7 @@ void NavEKF2_core::InitialiseVariablesMag()
     magFieldLearned = false;
 
     storedMag.reset();
+	storedYawAng.reset();
 }
 
 // Initialise the states from accelerometer and magnetometer data (if present)
@@ -553,6 +569,9 @@ void NavEKF2_core::UpdateFilter(bool predict)
 
         // Update states using GPS and altimeter data
         SelectVelPosFusion();
+
+        // Update states using GPS yaw data,baiyang added in 20190724
+		SelectGpsYawFusion();
 
         // Update states using range beacon data
         SelectRngBcnFusion();

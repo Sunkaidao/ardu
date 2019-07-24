@@ -573,6 +573,15 @@ const AP_Param::GroupInfo NavEKF2::var_info[] = {
     // @Range: 0 500
     // @Units: mGauss
     AP_GROUPINFO("MAG_EF_LIM", 52, NavEKF2, _mag_ef_limit, 50),
+
+	//baiyang added in 20170116
+	// @Param: HEAD_CONTROL
+	// @DisplayName: head_control 
+	// @Description: Head fusion mode control
+	// @Values: 0: Mag fusion,1: GPS head fusion
+	// @User: Advanced
+	AP_GROUPINFO("GPS_YAW_USE", 56, NavEKF2, _yaw_control, 0),
+	//added end
     
     AP_GROUPEND
 };
@@ -582,6 +591,7 @@ NavEKF2::NavEKF2(const AP_AHRS *ahrs, const RangeFinder &rng) :
     _rng(rng)
 {
     AP_Param::setup_object_defaults(this, var_info);
+	gps_yaw_health = true;
 }
 
 /*
@@ -1202,6 +1212,16 @@ void NavEKF2::writeOptFlowMeas(const uint8_t rawFlowQuality, const Vector2f &raw
     }
 }
 
+// write yaw angle sensor measurements
+void NavEKF2::writeEulerYawAngle(float yawAngle, float yawAngleErr, uint32_t timeStamp_ms, uint8_t type)
+{
+    if (core) {
+        for (uint8_t i=0; i<num_cores; i++) {
+            core[i].writeEulerYawAngle(yawAngle, yawAngleErr, timeStamp_ms, type);
+        }
+    }
+}
+
 // return data for debugging optical flow fusion
 void NavEKF2::getFlowDebug(int8_t instance, float &varFlow, float &gndOffset, float &flowInnovX, float &flowInnovY, float &auxInnov,
                            float &HAGL, float &rngInnov, float &range, float &gndOffsetErr) const
@@ -1596,4 +1616,15 @@ void NavEKF2::writeExtNavData(const Vector3f &sensOffset, const Vector3f &pos, c
         }
     }
 }
+
+bool NavEKF2::getIsGpsYawFusion()
+{
+    bool res = false;
+    if (core) {
+        res = core[primary].getIsGpsYawFusion();
+    }
+
+    return res;
+}
+
 
