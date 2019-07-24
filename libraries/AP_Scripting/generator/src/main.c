@@ -21,8 +21,9 @@ char keyword_userdata[]  = "userdata";
 char keyword_write[]     = "write";
 
 // attributes (should include the leading ' )
-char keyword_attr_enum[] = "'enum";
-char keyword_attr_null[] = "'Null";
+char keyword_attr_enum[]    = "'enum";
+char keyword_attr_literal[] = "'literal";
+char keyword_attr_null[]    = "'Null";
 
 // type keywords
 char keyword_boolean[]  = "boolean";
@@ -91,6 +92,7 @@ enum field_type {
   TYPE_NONE,
   TYPE_STRING,
   TYPE_ENUM,
+  TYPE_LITERAL,
   TYPE_USERDATA,
 };
 
@@ -140,6 +142,7 @@ struct type {
   union {
     char *userdata_name;
     char *enum_name;
+    char *literal;
   } data;
 };
 
@@ -363,6 +366,7 @@ unsigned int parse_access_flags(struct type * type) {
         case TYPE_USERDATA:
         case TYPE_BOOLEAN:
         case TYPE_STRING:
+        case TYPE_LITERAL:
           // a range check is illogical
           break;
         case TYPE_NONE:
@@ -419,6 +423,8 @@ int parse_type(struct type *type, const uint32_t restrictions, enum range_check_
   if (attribute != NULL) {
     if (strcmp(attribute, keyword_attr_enum) == 0) {
       type->flags |= TYPE_FLAGS_ENUM;
+    } else if (strcmp(attribute, keyword_attr_literal) == 0) {
+      type->type = TYPE_LITERAL;
     } else if (strcmp(attribute, keyword_attr_null) == 0) {
       if (restrictions & TYPE_RESTRICTION_NOT_NULLABLE) {
         error(ERROR_USERDATA, "%s is not nullable in this context", data_type);
@@ -453,6 +459,8 @@ int parse_type(struct type *type, const uint32_t restrictions, enum range_check_
   } else if (type->flags & TYPE_FLAGS_ENUM) {
     type->type = TYPE_ENUM;
     string_copy(&(type->data.enum_name), data_type);
+  } else if (type->type == TYPE_LITERAL) {
+      string_copy(&(type->data.literal), data_type);
   } else {
     // assume that this is a user data, we can't validate this until later though
     type->type = TYPE_USERDATA;
@@ -475,6 +483,7 @@ int parse_type(struct type *type, const uint32_t restrictions, enum range_check_
       case TYPE_ENUM:
       case TYPE_USERDATA:
         break;
+      case TYPE_LITERAL:
       case TYPE_NONE:
         error(ERROR_USERDATA, "%s types cannot be nullable", data_type);
         break;
@@ -498,6 +507,7 @@ int parse_type(struct type *type, const uint32_t restrictions, enum range_check_
       case TYPE_NONE:
       case TYPE_STRING:
       case TYPE_USERDATA:
+      case TYPE_LITERAL:
         // no sane range checks, so we can ignore this
         break;
     }
@@ -834,6 +844,7 @@ void emit_checker(const struct type t, int arg_number, const char *indentation, 
         fprintf(source, "%suint32_t data_%d = {};\n", indentation, arg_number);
         break;
       case TYPE_NONE:
+      case TYPE_LITERAL:
         return; // nothing to do here, this should potentially be checked outside of this, but it makes an easier implementation to accept it
       case TYPE_STRING:
         fprintf(source, "%schar * data_%d = {};\n", indentation, arg_number);
@@ -892,6 +903,7 @@ void emit_checker(const struct type t, int arg_number, const char *indentation, 
       case TYPE_STRING:
       case TYPE_BOOLEAN:
       case TYPE_USERDATA:
+      case TYPE_LITERAL:
         // these don't get range checked, so skip the raw_data phase
         assert(t.range == NULL); // we should have caught this during the parse phase
         break;
@@ -917,6 +929,7 @@ void emit_checker(const struct type t, int arg_number, const char *indentation, 
       case TYPE_STRING:
       case TYPE_BOOLEAN:
       case TYPE_USERDATA:
+      case TYPE_LITERAL:
         // these don't get range checked, so skip the raw_data phase
         assert(t.range == NULL); // we should have caught this during the parse phase
         break;
@@ -931,11 +944,37 @@ void emit_checker(const struct type t, int arg_number, const char *indentation, 
                 arg_number, t.range->high, forced_max,
                 arg_number, name);
        } else {
-        fprintf(source, "%sluaL_argcheck(L, ((raw_data_%d >= %s) && (raw_data_%d <= %s)), %d, \"%s out of range\");\n",
-                indentation,
-                arg_number, t.range->low,
-                arg_number, t.range->high,
-                arg_number, name);
+         char * cast_target = "";
+
+         switch (t.type) {
+           case TYPE_FLOAT:
+             cast_target = "float";
+             break;
+           case TYPE_INT8_T:
+           case TYPE_INT16_T:
+           case TYPE_INT32_T:
+           case TYPE_UINT8_T:
+           case TYPE_UINT16_T:
+           case TYPE_ENUM:
+             cast_target = "int32_t";
+             break;
+           case TYPE_UINT32_T:
+             cast_target = "uint32_t";
+             break;
+           case TYPE_NONE:
+           case TYPE_STRING:
+           case TYPE_BOOLEAN:
+           case TYPE_USERDATA:
+           case TYPE_LITERAL:
+             assert(t.range == NULL); // we should have caught this during the parse phase
+             break;
+         }
+
+         fprintf(source, "%sluaL_argcheck(L, ((raw_data_%d >= static_cast<%s>(%s)) && (raw_data_%d <= static_cast<%s>(%s))), %d, \"%s out of range\");\n",
+                 indentation,
+                 arg_number, cast_target, t.range->low,
+                 arg_number, cast_target, t.range->high,
+                 arg_number, name);
        }
     }
 
@@ -975,6 +1014,9 @@ void emit_checker(const struct type t, int arg_number, const char *indentation, 
       case TYPE_USERDATA:
         fprintf(source, "%s%s & data_%d = *check_%s(L, %d);\n", indentation, t.data.userdata_name, arg_number, t.data.userdata_name, arg_number);
         break;
+      case TYPE_LITERAL:
+        // literals are expected to be done directly later
+        break;
       case TYPE_NONE:
         // nothing to do, we've either already emitted a reasonable value, or returned
         break;
@@ -1010,6 +1052,9 @@ void emit_userdata_field(const struct userdata *data, const struct userdata_fiel
         break;
       case TYPE_NONE:
         error(ERROR_INTERNAL, "Can't access a NONE field");
+        break;
+      case TYPE_LITERAL:
+        error(ERROR_INTERNAL, "Can't access a literal field");
         break;
       case TYPE_STRING:
         fprintf(source, "            lua_pushstring(L, ud->%s);\n", field->name);
@@ -1067,7 +1112,7 @@ void emit_userdata_method(const struct userdata *data, const struct method *meth
   // sanity check number of args called with
   arg_count = 1;
   while (arg != NULL) {
-    if (!(arg->type.flags & TYPE_FLAGS_NULLABLE)) {
+    if (!(arg->type.flags & TYPE_FLAGS_NULLABLE) && !(arg->type.type == TYPE_LITERAL)) {
       arg_count++;
     }
     arg = arg->next;
@@ -1088,10 +1133,12 @@ void emit_userdata_method(const struct userdata *data, const struct method *meth
   arg = method->arguments;
   arg_count = 2;
   while (arg != NULL) {
-    // emit_checker will emit a nullable argument for us
-    emit_checker(arg->type, arg_count, "    ", "argument");
+    if (arg->type.type != TYPE_LITERAL) {
+      // emit_checker will emit a nullable argument for us
+      emit_checker(arg->type, arg_count, "    ", "argument");
+      arg_count++;
+    }
     arg = arg->next;
-    arg_count++;
   }
 
   if (data->flags & UD_FLAG_SEMAPHORE) {
@@ -1100,54 +1147,83 @@ void emit_userdata_method(const struct userdata *data, const struct method *meth
 
   switch (method->return_type.type) {
     case TYPE_BOOLEAN:
-      fprintf(source, "    const bool data = ud->%s(\n", method->name);
+      fprintf(source, "    const bool data = ud->%s(", method->name);
       break;
     case TYPE_FLOAT:
-      fprintf(source, "    const float data = ud->%s(\n", method->name);
+      fprintf(source, "    const float data = ud->%s(", method->name);
       break;
     case TYPE_INT8_T:
-      fprintf(source, "    const int8_t data = ud->%s(\n", method->name);
+      fprintf(source, "    const int8_t data = ud->%s(", method->name);
       break;
     case TYPE_INT16_T:
-      fprintf(source, "    const int6_t data = ud->%s(\n", method->name);
+      fprintf(source, "    const int6_t data = ud->%s(", method->name);
       break;
     case TYPE_INT32_T:
-      fprintf(source, "    const int32_t data = ud->%s(\n", method->name);
+      fprintf(source, "    const int32_t data = ud->%s(", method->name);
       break;
     case TYPE_STRING:
-      fprintf(source, "    const char * data = ud->%s(\n", method->name);
+      fprintf(source, "    const char * data = ud->%s(", method->name);
       break;
     case TYPE_UINT8_T:
-      fprintf(source, "    const uint8_t data = ud->%s(\n", method->name);
+      fprintf(source, "    const uint8_t data = ud->%s(", method->name);
       break;
     case TYPE_UINT16_T:
-      fprintf(source, "    const uint16_t data = ud->%s(\n", method->name);
+      fprintf(source, "    const uint16_t data = ud->%s(", method->name);
       break;
     case TYPE_UINT32_T:
-      fprintf(source, "    const uint32_t data = ud->%s(\n", method->name);
+      fprintf(source, "    const uint32_t data = ud->%s(", method->name);
       break;
     case TYPE_ENUM:
-      fprintf(source, "    const %s &data = ud->%s(\n", method->return_type.data.enum_name, method->name);
+      fprintf(source, "    const %s &data = ud->%s(", method->return_type.data.enum_name, method->name);
       break;
     case TYPE_USERDATA:
-      fprintf(source, "    const %s &data = ud->%s(\n", method->return_type.data.userdata_name, method->name);
+      fprintf(source, "    const %s &data = ud->%s(", method->return_type.data.userdata_name, method->name);
       break;
     case TYPE_NONE:
-      fprintf(source, "    ud->%s(\n", method->name);
+      fprintf(source, "    ud->%s(", method->name);
       break;
+    case TYPE_LITERAL:
+      error(ERROR_USERDATA, "Can't return a literal from a method");
+      break;
+  }
+
+  if (arg_count != 2) {
+    fprintf(source, "\n");
   }
 
   arg = method->arguments;
   arg_count = 2;
   while (arg != NULL) {
-    fprintf(source, "            data_%d", arg_count + ((arg->type.flags & TYPE_FLAGS_NULLABLE) ? NULLABLE_ARG_COUNT_BASE : 0));
+    switch (arg->type.type) {
+      case TYPE_BOOLEAN:
+      case TYPE_FLOAT:
+      case TYPE_INT8_T:
+      case TYPE_INT16_T:
+      case TYPE_INT32_T:
+      case TYPE_STRING:
+      case TYPE_UINT8_T:
+      case TYPE_UINT16_T:
+      case TYPE_UINT32_T:
+      case TYPE_ENUM:
+      case TYPE_USERDATA:
+        fprintf(source, "            data_%d", arg_count + ((arg->type.flags & TYPE_FLAGS_NULLABLE) ? NULLABLE_ARG_COUNT_BASE : 0));
+        break;
+      case TYPE_LITERAL:
+        fprintf(source, "            %s", arg->type.data.literal);
+        break;
+      case TYPE_NONE:
+        error(ERROR_INTERNAL, "Can't pass nil as an argument");
+        break;
+    }
+    if (arg->type.type != TYPE_LITERAL) {
+      arg_count++;
+    }
     arg = arg->next;
     if (arg != NULL) {
             fprintf(source, ",\n");
     }
-    arg_count++;
   }
-  fprintf(source, "%s);\n\n", arg_count == 2 ? "        " : "");
+  fprintf(source, "%s);\n\n", "");
 
   if (data->flags & UD_FLAG_SEMAPHORE) {
     fprintf(source, "    ud->get_semaphore().give();\n");
@@ -1195,6 +1271,9 @@ void emit_userdata_method(const struct userdata *data, const struct method *meth
               case TYPE_NONE:
                 error(ERROR_INTERNAL, "Attempted to emit a nullable argument of type none");
                 break;
+              case TYPE_LITERAL:
+                error(ERROR_INTERNAL, "Attempted to make a nullable literal");
+                break;
             }
           }
 
@@ -1232,6 +1311,7 @@ void emit_userdata_method(const struct userdata *data, const struct method *meth
       fprintf(source, "    *check_%s(L, -1) = data;\n", method->return_type.data.userdata_name);
       break;
     case TYPE_NONE:
+    case TYPE_LITERAL:
       // no return value, so don't worry about pushing a value
       return_count = 0;
       break;
