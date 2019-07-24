@@ -511,7 +511,7 @@ void AP_GPS::detect_instance(uint8_t instance)
             if (_type[instance] == GPS_TYPE_HEMI) {
                 send_blob_start(instance, AP_GPS_NMEA_HEMISPHERE_INIT_STRING, strlen(AP_GPS_NMEA_HEMISPHERE_INIT_STRING));
             } else if (_type[instance] == GPS_TYPE_HEMI2){
-                send_blob_start(instance, AP_GPS_NMEA_DUAL_ANTENNA_INIT_STRING, strlen(AP_GPS_NMEA_HEMISPHERE_INIT_STRING));
+                send_blob_start(instance, AP_GPS_NMEA_DUAL_ANTENNA_INIT_STRING, strlen(AP_GPS_NMEA_DUAL_ANTENNA_INIT_STRING));
 			} else {
                 send_blob_start(instance, _initialisation_blob, sizeof(_initialisation_blob));
             }
