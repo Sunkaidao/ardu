@@ -303,6 +303,23 @@ void AP_ToneAlarm::update()
         }
     }
 
+	// notify the user when gps yaw is lost,baiyang added in 20190725
+    if (flags.failsafe_gps_yaw != AP_Notify::flags.failsafe_gps_yaw) {
+        flags.failsafe_gps_yaw = AP_Notify::flags.failsafe_gps_yaw;
+        if (flags.failsafe_gps_yaw) {
+            // armed case handled by events.failsafe_mode_change
+            if (!AP_Notify::flags.armed) {
+                play_tone(AP_NOTIFY_TONE_QUIET_NEG_FEEDBACK);
+            }
+        } else {
+            if (AP_Notify::flags.armed) {
+                play_tone(AP_NOTIFY_TONE_LOUD_POS_FEEDBACK);
+            } else {
+                play_tone(AP_NOTIFY_TONE_QUIET_POS_FEEDBACK);
+            }
+        }
+    }
+
     // notify the user when pre_arm checks are passing
     if (flags.pre_arm_check != AP_Notify::flags.pre_arm_check) {
         flags.pre_arm_check = AP_Notify::flags.pre_arm_check;

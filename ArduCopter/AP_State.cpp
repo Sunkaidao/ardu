@@ -94,7 +94,7 @@ void Copter::set_failsafe_gps_yaw(bool b)
         }
 
         // update AP_Notify
-        AP_Notify::flags.failsafe_radio = b;
+        AP_Notify::flags.failsafe_gps_yaw = b;
     }
 }
 

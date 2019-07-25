@@ -121,7 +121,8 @@ uint32_t RGBLed::get_colour_sequence(void) const
         AP_Notify::flags.failsafe_battery ||
         AP_Notify::flags.ekf_bad ||
         AP_Notify::flags.gps_glitching ||
-        AP_Notify::flags.leak_detected) {
+        AP_Notify::flags.leak_detected ||
+        AP_Notify::flags.failsafe_gps_yaw) {
 
         if (AP_Notify::flags.leak_detected) {
             // purple if leak detected
