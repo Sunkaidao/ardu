@@ -328,6 +328,7 @@ void AP_GPS::init(const AP_SerialManager& serial_manager)
         if (_rate_ms[i] <= 0 || _rate_ms[i] > GPS_MAX_RATE_MS) {
             _rate_ms[i] = GPS_MAX_RATE_MS;
         }
+		state[i].declination = _declination[i];
     }
 }
 
