@@ -574,6 +574,7 @@ const AP_Param::GroupInfo NavEKF2::var_info[] = {
     // @Units: mGauss
     AP_GROUPINFO("MAG_EF_LIM", 52, NavEKF2, _mag_ef_limit, 50),
 
+#if GPS_YAW_EKF_ENABLED == 1
 	//baiyang added in 20170116
 	// @Param: HEAD_CONTROL
 	// @DisplayName: head_control 
@@ -582,7 +583,8 @@ const AP_Param::GroupInfo NavEKF2::var_info[] = {
 	// @User: Advanced
 	AP_GROUPINFO("GPS_YAW_USE", 56, NavEKF2, _yaw_control, 0),
 	//added end
-    
+#endif
+
     AP_GROUPEND
 };
 
@@ -591,7 +593,6 @@ NavEKF2::NavEKF2(const AP_AHRS *ahrs, const RangeFinder &rng) :
     _rng(rng)
 {
     AP_Param::setup_object_defaults(this, var_info);
-	gps_yaw_health = true;
 }
 
 /*

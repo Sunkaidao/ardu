@@ -69,6 +69,57 @@ void Copter::set_failsafe_radio(bool b)
     }
 }
 
+// ---------------------------------------------
+void Copter::set_failsafe_gps_yaw(bool b)
+{
+    //failsafe.gps_head = b;
+    //AP_Notify::flags.failsafe_battery = b;
+
+    // only act on changes
+    // -------------------
+    if(failsafe.gps_yaw != b) {
+
+        // store the value so we don't trip the gate twice
+        // -----------------------------------------------
+        failsafe.gps_yaw = b;
+
+        if (failsafe.gps_yaw == false) {
+            // We've regained gps head data
+            // ----------------------------
+            failsafe_gps_yaw_off_event();
+        }else{
+            // We've lost gps head data
+            // ------------------------
+            failsafe_gps_yaw_on_event();
+        }
+
+        // update AP_Notify
+        AP_Notify::flags.failsafe_radio = b;
+    }
+}
+
+void Copter::check_failsafe_gps_yaw()
+{
+    static uint8_t step = 0;
+
+    switch (step){
+	    case 0:
+			if (EKF2.getIsGpsYawFusion()){
+                step ++;
+			}
+            break;
+		case 1:
+			if (!EKF2.getIsGpsYawFusion()){
+                set_failsafe_gps_yaw(true);
+			}else{
+                set_failsafe_gps_yaw(false);
+			}
+            break;
+        default:
+			step = 0;
+			break;
+	}
+}
 
 // ---------------------------------------------
 void Copter::set_failsafe_gcs(bool b)

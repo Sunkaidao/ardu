@@ -30,7 +30,6 @@ void NavEKF2_core::controlGpsYawReset()
 				//Use magnetic compass data to force reset yaw angle
 				magYawResetRequest = true;
 				magStateResetRequest = true;
-				frontend->gps_yaw_health = false;
 				gcs().send_text(MAV_SEVERITY_INFO, "EKF2 IMU%u GPS yaw anomaly, yaw re-aligned for mag",(unsigned)imu_index);
 			}
 		}
@@ -44,7 +43,6 @@ void NavEKF2_core::controlGpsYawReset()
 				
                 alignGpsYaw();
 				
-				frontend->gps_yaw_health = true;
 				gcs().send_text(MAV_SEVERITY_INFO, "EKF2 IMU%u GPS yaw restores health",(unsigned)imu_index);
 			}
 		}
@@ -111,9 +109,10 @@ void NavEKF2_core::alignGpsYaw()
 // select fusion of magnetometer data
 void NavEKF2_core::SelectGpsYawFusion()
 {
-    // start performance timer
-    //hal.util->perf_begin(_perf_FuseMagnetometer);
-	
+#if GPS_YAW_EKF_ENABLED != 1
+    return;
+#endif
+
 	// check for availability of gps heading data to fuse
 	gpsHeadDataToFuse = storedYawAng.recall(yawAngDataDelayed,imuDataDelayed.time_ms);
 

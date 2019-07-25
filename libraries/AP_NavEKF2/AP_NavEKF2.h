@@ -31,6 +31,8 @@
 #include <AP_RangeFinder/AP_RangeFinder.h>
 #include <AP_Logger/LogStructure.h>
 
+#define GPS_YAW_EKF_ENABLED  1
+
 class NavEKF2_core;
 class AP_AHRS;
 
@@ -370,9 +372,6 @@ public:
     int8_t get_ekf_heading_mode(void){ return _yaw_control.get();}
     //added end
 
-    int8_t get_gps_heading_health(){ return gps_yaw_health;}
-    void set_gps_heading_health(int8_t status){ gps_yaw_health = status;}
-
 	bool getIsGpsYawFusion();
 
 private:
@@ -384,8 +383,6 @@ private:
 
     uint32_t _frameTimeUsec;        // time per IMU frame
     uint8_t  _framesPerPrediction;  // expected number of IMU frames per prediction
-
-	int8_t gps_yaw_health;
 
     // EKF Mavlink Tuneable Parameters
     AP_Int8  _enable;               // zero to disable EKF2

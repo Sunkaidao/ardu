@@ -716,6 +716,15 @@ const AP_Param::Info Copter::var_info[] = {
     // @Group:
     // @Path: Parameters.cpp
     GOBJECT(g2, "",  ParametersG2),
+    
+#if GPS_YAW_EKF_ENABLED == ENABLED
+	// @Param: FS_GPS_HEAD
+	// @DisplayName: Dual GPS head Failsafe Enable
+	// @Description: Controls whether failsafe will be invoked when dual gps heading date timeout
+	// @Values: 0:Disabled,1:RTL,2:Land,3:Loiter
+	// @User: Standard
+	GSCALAR(failsafe_gps_yaw, "FS_GYAW_ENABLE", FS_GPS_YAW_DISABLED),
+#endif
 
     AP_VAREND
 };
