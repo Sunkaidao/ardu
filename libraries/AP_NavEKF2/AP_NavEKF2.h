@@ -369,7 +369,7 @@ public:
     void Log_Write();
 
     //baiyang added in 20171023
-    int8_t get_ekf_heading_mode(void){ return _yaw_control.get();}
+    int8_t get_ekf_yaw_mode(void){ return _yaw_control.get();}
     //added end
 
 	bool getIsGpsYawFusion();
