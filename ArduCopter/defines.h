@@ -76,6 +76,7 @@ enum mode_reason_t {
     MODE_REASON_THROW_COMPLETE,
     MODE_REASON_TERMINATE,
     MODE_REASON_TMODE,
+    MODE_REASON_GPS_YAW_FAILSAFE, //baiyang added in 20180612
 };
 
 // Tuning enumeration
@@ -247,6 +248,15 @@ enum LoggingParameters {
 #define FS_THR_ENABLED_ALWAYS_LAND                 3
 #define FS_THR_ENABLED_ALWAYS_SMARTRTL_OR_RTL      4
 #define FS_THR_ENABLED_ALWAYS_SMARTRTL_OR_LAND     5
+
+// GPS YAW Lost failsafe (FS_GYAW_ENABLE parameter)
+#define FS_GPS_YAW_DISABLED				0
+#define FS_GPS_YAW_ENABLED_RTL			1
+#define FS_GPS_YAW_ENABLED_LAND			2
+#define FS_GPS_YAW_ENABLED_LOITER		3
+#define FS_GPS_YAW_ENABLED_ALWAYS_SMARTRTL_OR_RTL      4
+#define FS_GPS_YAW_ENABLED_ALWAYS_SMARTRTL_OR_LAND     5
+
 
 // GCS failsafe definitions (FS_GCS_ENABLE parameter)
 #define FS_GCS_DISABLED                        0

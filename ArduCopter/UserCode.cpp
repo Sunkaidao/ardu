@@ -33,6 +33,11 @@ void Copter::userhook_MediumLoop()
 void Copter::userhook_SlowLoop()
 {
     // put your 3.3Hz code here
+
+#if GPS_YAW_EKF_ENABLED == ENABLED
+    check_failsafe_gps_yaw();
+#endif
+
 }
 #endif
 

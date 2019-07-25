@@ -1353,7 +1353,7 @@ bool AP_AHRS_NavEKF::attitudes_consistent(char *failure_msg, const uint8_t failu
     Quaternion primary_quat;
     get_quat_body_to_ned(primary_quat);
     // only check yaw if compasses are being used
-    bool check_yaw = _compass && _compass->use_for_yaw();
+    bool check_yaw = _compass && _compass->use_for_yaw() && !EKF2.getIsGpsYawFusion();
 
     // check primary vs ekf2
     for (uint8_t i = 0; i < EKF2.activeCores(); i++) {

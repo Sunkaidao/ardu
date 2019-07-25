@@ -56,6 +56,7 @@ class AP_GPS
     friend class AP_GPS_SIRF;
     friend class AP_GPS_UBLOX;
     friend class AP_GPS_Backend;
+	friend class AP_GPS_NMEA_DA;
 
 public:
     AP_GPS();
@@ -86,6 +87,7 @@ public:
         GPS_TYPE_MAV = 14,
         GPS_TYPE_NOVA = 15,
         GPS_TYPE_HEMI = 16, // hemisphere NMEA
+        GPS_TYPE_HEMI2 = 17, // hemisphere NMEA baiyang added in 20190723
     };
 
     /// GPS status codes
@@ -98,6 +100,16 @@ public:
         GPS_OK_FIX_3D_RTK_FLOAT = GPS_FIX_TYPE_RTK_FLOAT, ///< Receiving valid messages and 3D RTK Float
         GPS_OK_FIX_3D_RTK_FIXED = GPS_FIX_TYPE_RTK_FIXED, ///< Receiving valid messages and 3D RTK Fixed
     };
+
+	//baiyang added in 20170119
+    /// GPS Head status codes
+    enum GPS_Head_Status {
+    	NONE = 0,			   ///< No GPS connected/detected
+    	L1_FLOAT = 1,		   ///< Receiving valid GPS messages but no lock
+    	NARROW_FLOAT = 2,	   ///< Receiving valid messages and 2D lock
+    	NARROW_INT = 3, 	   ///< Receiving valid messages and 3D lock
+    };
+    //added end
 
     // GPS navigation engine settings. Not all GPS receivers support
     // this
@@ -158,7 +170,21 @@ public:
         int32_t  rtk_baseline_z_mm;        ///< Current baseline in ECEF z or NED down component in mm
         uint32_t rtk_accuracy;             ///< Current estimate of 3D baseline accuracy (receiver dependent, typical 0 to 9999)
         int32_t  rtk_iar_num_hypotheses;   ///< Current number of integer ambiguity hypotheses
+
+        ///baiyang first added in 20170620
+		GPS_Head_Status head_status;          ///< #HEADINGA status
+		float           declination;
     };
+
+
+	//baiyang added in 20170119
+	GPS_Head_Status head_status(uint8_t instance) const {
+        return state[instance].head_status;
+	}
+	GPS_Head_Status head_status(void) const {
+        return head_status(primary_instance);
+    }
+    //added end
 
     /// Startup initialisation.
     void init(const AP_SerialManager& serial_manager);
@@ -453,6 +479,7 @@ protected:
     AP_Int16 _delay_ms[GPS_MAX_RECEIVERS];
     AP_Int8 _blend_mask;
     AP_Float _blend_tc;
+	AP_Float _declination[GPS_MAX_RECEIVERS]; //baiyang added in 20190723
 
     uint32_t _log_gps_bit = -1;
 
@@ -503,6 +530,7 @@ private:
         struct SBP_detect_state sbp_detect_state;
         struct SBP2_detect_state sbp2_detect_state;
         struct ERB_detect_state erb_detect_state;
+		struct NMEA_DA_detect_state nmea_da_detect_state;
     } detect_state[GPS_MAX_RECEIVERS];
 
     struct {

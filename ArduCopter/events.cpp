@@ -84,6 +84,40 @@ void Copter::handle_battery_failsafe(const char *type_str, const int8_t action)
     }
 }
 
+void Copter::failsafe_gps_yaw_on_event(void)
+{
+    // failsafe check
+    if (g.failsafe_gps_yaw != FS_GPS_YAW_DISABLED && motors->armed()) {
+        if (should_disarm_on_failsafe()) {
+            arming.disarm();
+        } else {
+            if (g.failsafe_gps_yaw == FS_GPS_YAW_ENABLED_RTL) {
+                set_mode_RTL_or_land_with_pause(MODE_REASON_GPS_YAW_FAILSAFE);
+            } else if(g.failsafe_gps_yaw == FS_GPS_YAW_ENABLED_LAND){
+                set_mode_land_with_pause(MODE_REASON_GPS_YAW_FAILSAFE);
+            }else if(g.failsafe_gps_yaw == FS_GPS_YAW_ENABLED_LOITER){
+                set_mode(LOITER,MODE_REASON_GPS_YAW_FAILSAFE);
+            }else if(g.failsafe_gps_yaw == FS_GPS_YAW_ENABLED_ALWAYS_SMARTRTL_OR_RTL){
+                set_mode_SmartRTL_or_RTL(MODE_REASON_GPS_YAW_FAILSAFE);
+            }else if(g.failsafe_gps_yaw == FS_GPS_YAW_ENABLED_ALWAYS_SMARTRTL_OR_LAND){
+                set_mode_SmartRTL_or_land_with_pause(MODE_REASON_GPS_YAW_FAILSAFE);
+            }else{
+                set_mode_RTL_or_land_with_pause(MODE_REASON_GPS_YAW_FAILSAFE);
+            }
+        }
+    }
+
+    // warn the ground station and log to dataflash
+    gcs().send_text(MAV_SEVERITY_WARNING,"Gps yaw not healthy,select mag");
+    AP::logger().Write_Error(LogErrorSubsystem::FAILSAFE_GPS_YAW, LogErrorCode::FAILSAFE_OCCURRED);
+}
+
+void Copter::failsafe_gps_yaw_off_event(void)
+{
+    //log to dataflash
+    AP::logger().Write_Error(LogErrorSubsystem::FAILSAFE_GPS_YAW, LogErrorCode::FAILSAFE_RESOLVED);
+}
+
 // failsafe_gcs_check - check for ground station failsafe
 void Copter::failsafe_gcs_check()
 {

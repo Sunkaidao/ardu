@@ -400,6 +400,8 @@ private:
         uint8_t ekf                 : 1; // true if ekf failsafe has occurred
         uint8_t terrain             : 1; // true if the missing terrain data failsafe has occurred
         uint8_t adsb                : 1; // true if an adsb related failsafe has occurred
+
+		uint8_t gps_yaw             : 1; // true if gps yaw lost
     } failsafe;
 
     bool any_failsafe_triggered() const {
@@ -620,6 +622,8 @@ private:
     void set_auto_armed(bool b);
     void set_simple_mode(uint8_t b);
     void set_failsafe_radio(bool b);
+	void set_failsafe_gps_yaw(bool b); //baiyang added in 20180612
+	void check_failsafe_gps_yaw(); //baiyang added in 20190725
     void set_failsafe_gcs(bool b);
     void update_using_interlock();
 
@@ -697,6 +701,8 @@ private:
     void failsafe_radio_on_event();
     void failsafe_radio_off_event();
     void handle_battery_failsafe(const char* type_str, const int8_t action);
+	void failsafe_gps_yaw_on_event(void); //baiyang added in 20180612
+	void failsafe_gps_yaw_off_event(void);//baiyang added in 20180612
     void failsafe_gcs_check();
     void failsafe_gcs_off_event(void);
     void failsafe_terrain_check();
