@@ -222,6 +222,8 @@ AC_PosControl::AC_PosControl(const AP_AHRS_View& ahrs, const AP_InertialNav& ina
     _limit.vel_up = true;
     _limit.vel_down = true;
     _limit.accel_xy = true;
+
+	_throttle_alt_offset = 0;
 }
 
 ///
@@ -304,6 +306,7 @@ void AC_PosControl::set_alt_target_from_climb_rate(float climb_rate_cms, float d
     // To-Do: add check of _limit.pos_down?
     if ((climb_rate_cms < 0 && (!_motors.limit.throttle_lower || force_descend)) || (climb_rate_cms > 0 && !_motors.limit.throttle_upper && !_limit.pos_up)) {
         _pos_target.z += climb_rate_cms * dt;
+		_throttle_alt_offset += climb_rate_cms * dt;
     }
 
     // do not use z-axis desired velocity feed forward
@@ -345,6 +348,7 @@ void AC_PosControl::set_alt_target_from_climb_rate_ff(float climb_rate_cms, floa
     // To-Do: add check of _limit.pos_down?
     if ((_vel_desired.z < 0 && (!_motors.limit.throttle_lower || force_descend)) || (_vel_desired.z > 0 && !_motors.limit.throttle_upper && !_limit.pos_up)) {
         _pos_target.z += _vel_desired.z * dt;
+		_throttle_alt_offset += climb_rate_cms * dt;
     }
 }
 

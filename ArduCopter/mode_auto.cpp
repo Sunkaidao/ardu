@@ -751,12 +751,17 @@ void ModeAuto::wp_run()
 {
     // process pilot's yaw input
     float target_yaw_rate = 0;
+	float target_climb_rate = 0.0f;
     if (!copter.failsafe.radio) {
         // get pilot's desired yaw rate
         target_yaw_rate = get_pilot_desired_yaw_rate(channel_yaw->get_control_in());
         if (!is_zero(target_yaw_rate)) {
             auto_yaw.set_mode(AUTO_YAW_HOLD);
         }
+
+		// get pilot desired climb rate
+        target_climb_rate = get_pilot_desired_climb_rate(channel_throttle->get_control_in());
+        target_climb_rate = constrain_float(target_climb_rate, -get_pilot_speed_dn(), g.pilot_speed_up);
     }
 
     // if not armed set throttle to zero and exit immediately
@@ -768,6 +773,14 @@ void ModeAuto::wp_run()
 
     // set motors to full range
     motors->set_desired_spool_state(AP_Motors::DesiredSpoolState::THROTTLE_UNLIMITED);
+
+	// adjust climb rate using rangefinder
+    target_climb_rate = copter.get_surface_tracking_climb_rate(target_climb_rate);
+	
+    // get avoidance adjusted climb rate
+    target_climb_rate = get_avoidance_adjusted_climbrate(target_climb_rate);
+	
+    pos_control->set_alt_target_from_climb_rate_ff(target_climb_rate, G_Dt, false);
 
     // run waypoint controller
     copter.failsafe_terrain_set_status(wp_nav->update_wpnav());

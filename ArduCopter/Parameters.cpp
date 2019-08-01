@@ -725,7 +725,6 @@ const AP_Param::Info Copter::var_info[] = {
 	// @User: Standard
 	GSCALAR(failsafe_gps_yaw, "FS_GYAW_ENABLE", FS_GPS_YAW_DISABLED),
 #endif
-
     AP_VAREND
 };
 

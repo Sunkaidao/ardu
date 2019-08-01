@@ -312,4 +312,6 @@ protected:
     AP_Int8     _rangefinder_use;
     bool        _rangefinder_healthy;
     float       _rangefinder_alt_cm;
+
+	float       _throttle_alt_offset_last;
 };

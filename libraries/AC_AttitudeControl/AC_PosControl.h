@@ -298,6 +298,10 @@ public:
                         char *failure_msg,
                         const uint8_t failure_msg_len);
 
+    void reset_throttle_alt_offset() { _throttle_alt_offset = 0; }
+
+	float get_throttle_alt_offset() { return _throttle_alt_offset; }
+
     static const struct AP_Param::GroupInfo var_info[];
 
 protected:
@@ -417,4 +421,6 @@ protected:
     // ekf reset handling
     uint32_t    _ekf_xy_reset_ms;      // system time of last recorded ekf xy position reset
     uint32_t    _ekf_z_reset_ms;       // system time of last recorded ekf altitude reset
+
+	float       _throttle_alt_offset;  // 
 };

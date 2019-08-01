@@ -125,6 +125,9 @@ void AC_WPNav::wp_and_spline_init()
     _pos_control.set_max_accel_z(_wp_accel_z_cmss);
     _pos_control.calc_leash_length_xy();
     _pos_control.calc_leash_length_z();
+	_pos_control.reset_throttle_alt_offset(); //baiyang added in 20190812
+
+	_throttle_alt_offset_last = _pos_control.get_throttle_alt_offset();
 
     // initialise yaw heading to current heading target
     _flags.wp_yaw_set = false;
@@ -223,11 +226,13 @@ bool AC_WPNav::set_wp_destination_NED(const Vector3f& destination_NED)
 ///     returns false on failure (likely caused by missing terrain data)
 bool AC_WPNav::set_wp_origin_and_destination(const Vector3f& origin, const Vector3f& destination, bool terrain_alt)
 {
+    float throttle_alt_offset = _pos_control.get_throttle_alt_offset();
+	
     // store origin and destination locations
     _origin = origin;
     _destination = destination;
     _terrain_alt = terrain_alt;
-    Vector3f pos_delta = _destination - _origin;
+    Vector3f pos_delta = _destination - _origin + Vector3f(0,0,throttle_alt_offset);
 
     _track_length = pos_delta.length(); // get track length
     _track_length_xy = safe_sqrt(sq(pos_delta.x)+sq(pos_delta.y));  // get horizontal track length (used to decide if we should update yaw)
@@ -269,6 +274,8 @@ bool AC_WPNav::set_wp_origin_and_destination(const Vector3f& origin, const Vecto
     float speed_along_track = curr_vel.x * _pos_delta_unit.x + curr_vel.y * _pos_delta_unit.y + curr_vel.z * _pos_delta_unit.z;
     _limited_speed_xy_cms = constrain_float(speed_along_track, 0, _pos_control.get_max_speed_xy());
 
+    _throttle_alt_offset_last = throttle_alt_offset;
+	
     return true;
 }
 
@@ -330,7 +337,11 @@ bool AC_WPNav::advance_wp_target_along_track(float dt)
     }
 
     // calculate 3d vector from segment's origin
-    Vector3f curr_delta = (curr_pos - Vector3f(0,0,terr_offset)) - _origin;
+    //Vector3f curr_delta = (curr_pos - Vector3f(0,0,terr_offset)) - _origin;
+
+	float throttle_alt_offset = _pos_control.get_throttle_alt_offset();
+    // calculate 3d vector from segment's origin
+    Vector3f curr_delta = (curr_pos - Vector3f(0,0,terr_offset + throttle_alt_offset - _throttle_alt_offset_last)) - _origin;
 
     // calculate how far along the track we are
     track_covered = curr_delta.x * _pos_delta_unit.x + curr_delta.y * _pos_delta_unit.y + curr_delta.z * _pos_delta_unit.z;
@@ -429,8 +440,14 @@ bool AC_WPNav::advance_wp_target_along_track(float dt)
     // recalculate the desired position
     Vector3f final_target = _origin + _pos_delta_unit * _track_desired;
     // convert final_target.z to altitude above the ekf origin
-    final_target.z += terr_offset;
-    _pos_control.set_pos_target(final_target);
+    final_target.z += (terr_offset + throttle_alt_offset);
+    //_pos_control.set_pos_target(final_target);
+
+	if (is_zero(throttle_alt_offset)) {
+        _pos_control.set_pos_target(final_target);
+	}else {
+        _pos_control.set_xy_target(final_target.x,final_target.y);
+	}
 
     // check if we've reached the waypoint
     if( !_flags.reached_destination ) {
@@ -440,7 +457,7 @@ bool AC_WPNav::advance_wp_target_along_track(float dt)
                 _flags.reached_destination = true;
             }else{
                 // regular waypoints also require the copter to be within the waypoint radius
-                Vector3f dist_to_dest = (curr_pos - Vector3f(0,0,terr_offset)) - _destination;
+                Vector3f dist_to_dest = (curr_pos - Vector3f(0,0,terr_offset + throttle_alt_offset)) - _destination;
                 if( dist_to_dest.length() <= _wp_radius_cm ) {
                     _flags.reached_destination = true;
                 }
