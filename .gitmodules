@@ -16,3 +16,4 @@
 [submodule "modules/ChibiOS"]
 	path = modules/ChibiOS
 	url = git@192.168.10.241:liuleilei/ChibiOS.git
+
