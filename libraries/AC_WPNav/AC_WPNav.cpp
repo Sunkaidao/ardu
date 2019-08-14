@@ -446,7 +446,7 @@ bool AC_WPNav::advance_wp_target_along_track(float dt)
 	if (is_zero(throttle_alt_offset)) {
         _pos_control.set_pos_target(final_target);
 	}else {
-        _pos_control.set_xy_target(final_target.x,final_target.y);
+        _pos_control.set_pos_target_ff(final_target);
 	}
 
     // check if we've reached the waypoint

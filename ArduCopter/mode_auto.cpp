@@ -780,7 +780,7 @@ void ModeAuto::wp_run()
     // get avoidance adjusted climb rate
     target_climb_rate = get_avoidance_adjusted_climbrate(target_climb_rate);
 	
-    pos_control->set_alt_target_from_climb_rate_ff(target_climb_rate, G_Dt, false);
+    pos_control->set_alt_target_from_climb_rf_rate_ff(target_climb_rate, G_Dt, false);
 
     // run waypoint controller
     copter.failsafe_terrain_set_status(wp_nav->update_wpnav());
