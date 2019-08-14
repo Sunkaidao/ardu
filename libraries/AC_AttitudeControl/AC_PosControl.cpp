@@ -834,10 +834,10 @@ void AC_PosControl::write_log()
     lean_angles_to_accel(accel_x, accel_y);
 
     AP::logger().Write("PSC",
-                       "TimeUS,TPX,TPY,PX,PY,TVX,TVY,VX,VY,TAX,TAY,AX,AY",
-                       "smmmmnnnnoooo",
-                       "F000000000000",
-                       "Qffffffffffff",
+                       "TimeUS,TPX,TPY,PX,PY,TVX,TVY,VX,VY,TAX,TAY,AX,AY,TAltO",
+                       "smmmmnnnnoooom",
+                       "F0000000000000",
+                       "Qfffffffffffff",
                        AP_HAL::micros64(),
                        double(pos_target.x * 0.01f),
                        double(pos_target.y * 0.01f),
@@ -850,7 +850,8 @@ void AC_PosControl::write_log()
                        double(accel_target.x * 0.01f),
                        double(accel_target.y * 0.01f),
                        double(accel_x * 0.01f),
-                       double(accel_y * 0.01f));
+                       double(accel_y * 0.01f),
+                       double(_throttle_alt_offset * 0.01f));
 }
 
 /// init_vel_controller_xyz - initialise the velocity controller - should be called once before the caller attempts to use the controller
