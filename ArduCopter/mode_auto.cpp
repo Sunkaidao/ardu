@@ -783,7 +783,7 @@ void ModeAuto::wp_run()
     pos_control->set_alt_target_from_climb_rf_rate_ff(target_climb_rate, G_Dt, false);
 
     // run waypoint controller
-    copter.failsafe_terrain_set_status(wp_nav->update_wpnav());
+    copter.failsafe_terrain_set_status(wp_nav->update_wpnav_rf());
 
     // call z-axis position controller (wpnav should have already updated it's alt target)
     pos_control->update_z_controller();

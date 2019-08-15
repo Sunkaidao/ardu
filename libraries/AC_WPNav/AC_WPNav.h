@@ -148,6 +148,9 @@ public:
     /// update_wpnav - run the wp controller - should be called at 100hz or higher
     bool update_wpnav();
 
+	/// update_wpnav - run the wp controller - should be called at 100hz or higher
+    bool update_wpnav_rf();
+
     // check_wp_leash_length - check recalc_wp_leash flag and calls calculate_wp_leash_length() if necessary
     //  should be called after _pos_control.update_xy_controller which may have changed the position controller leash lengths
     void check_wp_leash_length();
@@ -213,6 +216,9 @@ public:
 
     /// advance_wp_target_along_track - move target location along track from origin to destination
     bool advance_wp_target_along_track(float dt);
+
+    /// advance_wp_target_along_track - move target location along track from origin to destination
+    bool advance_wp_target_along_track_rf(float dt);
 
     /// return the crosstrack_error - horizontal error of the actual position vs the desired position
     float crosstrack_error() const { return _track_error_xy;}
