@@ -232,7 +232,7 @@ bool AC_WPNav::set_wp_origin_and_destination(const Vector3f& origin, const Vecto
     _origin = origin;
     _destination = destination;
     _terrain_alt = terrain_alt;
-    Vector3f pos_delta = _destination - _origin + Vector3f(0,0,throttle_alt_offset);
+    Vector3f pos_delta = _destination - _origin + Vector3f(0,0,is_zero(throttle_alt_offset) ? 0 : _origin.z - _destination.z);
 
     _track_length = pos_delta.length(); // get track length
     _track_length_xy = safe_sqrt(sq(pos_delta.x)+sq(pos_delta.y));  // get horizontal track length (used to decide if we should update yaw)
