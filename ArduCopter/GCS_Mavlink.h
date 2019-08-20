@@ -12,6 +12,9 @@ protected:
     uint32_t telem_delay() const override;
 
     MAV_RESULT handle_flight_termination(const mavlink_command_long_t &packet) override;
+
+	
+	
     AP_AdvancedFailsafe *get_advanced_failsafe() const override;
 
     uint8_t sysid_my_gcs() const override;
@@ -32,6 +35,7 @@ protected:
     MAV_RESULT handle_command_mount(const mavlink_command_long_t &packet) override;
     MAV_RESULT handle_command_int_packet(const mavlink_command_int_t &packet) override;
     MAV_RESULT handle_command_long_packet(const mavlink_command_long_t &packet) override;
+	void handle_command_auth_protoca_post(const mavlink_command_long_t &packet, MAV_RESULT result);
 
     void handle_mount_message(const mavlink_message_t &msg) override;
 

@@ -70,12 +70,16 @@ void MissionItemProtocol::handle_mission_request_list(
     const mavlink_mission_request_list_t &packet,
     const mavlink_message_t &msg)
 {
+	//gcs().send_text(MAV_SEVERITY_WARNING, "2 %d", item_count());
+
     if (receiving) {
         // someone is uploading a mission; reject fetching of points
         // until done or timeout
         send_mission_ack(_link, msg, MAV_MISSION_DENIED);
         return;
     }
+
+	//gcs().send_text(MAV_SEVERITY_WARNING, "3 %d", item_count());
 
     // reply with number of commands in the mission.  The GCS will
     // then request each command separately

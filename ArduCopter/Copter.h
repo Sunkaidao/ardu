@@ -486,6 +486,25 @@ private:
     // handle repeated servo and relay events
     AP_ServoRelayEvents ServoRelayEvents;
 
+	
+		//	added end by ZhangYong 20161109
+#if FXTX_AUTH == ENABLED
+		struct current_gps_week_ms curr_gps_week_ms;
+	
+		char	auth_msg[100];
+	
+		char auth_id[AUTH_ID_LEN];
+	
+	//	union auth_id_para id_para;
+	
+		auth_result auth_result_ms = auth_result_failed;
+	
+		auth_state auth_state_ms = auth_state_initialize;
+	
+		uint8_t auth_state_timeout_cnt = 0;
+		//uint8_t auth_state_timeout_switch = 0;
+#endif	
+
     // Camera
 #if CAMERA == ENABLED
     AP_Camera camera{MASK_LOG_CAMERA, current_loc};
@@ -854,6 +873,7 @@ private:
     const char* get_frame_string();
     void allocate_motors(void);
     bool is_tradheli() const;
+	MAV_RESULT handle_command_auth_protoca_ahead(const mavlink_command_long_t &packet);
 
     // terrain.cpp
     void terrain_update();

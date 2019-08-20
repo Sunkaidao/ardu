@@ -631,3 +631,110 @@ bool Copter::is_tradheli() const
     return false;
 #endif
 }
+
+
+MAV_RESULT Copter::handle_command_auth_protoca_ahead(const mavlink_command_long_t &packet)
+{
+	MAV_RESULT result = MAV_RESULT_FAILED;
+	union auth_id_para id_para;
+		
+	uint8_t lcl_counter;
+	memset(&id_para, 0, sizeof(union auth_id_para));
+
+	
+
+	//gcs().send_text(MAV_SEVERITY_INFO, "%d",packet.command);
+	
+	switch(packet.command) 
+	{
+	//	added by ZhangYong 20170705
+		case MAV_CMD_AUTH_PROTOCAL:
+		{
+/*			gcs().send_text(MAV_SEVERITY_INFO,"up %d %d", \
+			copter.auth_state_ms, copter.auth_result_ms);
+*/	
+			if(auth_state_initialize == copter.auth_state_ms)
+			{
+				copter.auth_state_ms = auth_state_up_whoami;
+			
+//				copter.Log_Write_Event(DATA_AUTH_UP_WHOAMI);
+					
+			}
+			else if(auth_state_up_auth == copter.auth_state_ms)
+			{
+				copter.auth_state_ms = auth_state_done;
+	
+//							copter.Log_Write_Event(DATA_AUTH_UP_AUTH);
+					
+				id_para.serial[0] = packet.param1;
+				id_para.serial[1] = packet.param2;
+				id_para.serial[2] = packet.param3;
+				id_para.serial[3] = packet.param4;
+				id_para.serial[4] = packet.param5;
+
+/*							for(lcl_counter = 0; lcl_counter < 20; lcl_counter++)
+							{
+					
+								gcs().send_text(MAV_SEVERITY_INFO, "%d:%.2x vs %.2x", \
+																		lcl_counter, \
+																		id_para.data[lcl_counter]				);
+
+							}
+
+				for(lcl_counter = 0; lcl_counter < 12; lcl_counter++)
+				{
+					
+								gcs().send_text(MAV_SEVERITY_INFO, "%d:%.2x vs %.2x", \
+																		lcl_counter, \
+																		id_para.data[lcl_counter], \
+																		copter.auth_id[lcl_counter]);
+
+				}
+*/				for(lcl_counter = 0; lcl_counter < 12; lcl_counter++)
+				{
+					/*	added by ZhangYong 20161021
+					added	end*/
+								
+					if(id_para.data[lcl_counter] != copter.auth_id[lcl_counter])
+					{
+						break;
+					}
+				}
+	
+				if(lcl_counter != 12)
+				{
+					result = MAV_RESULT_FAILED;
+				}
+				else
+				{
+					result = MAV_RESULT_ACCEPTED;
+	
+					if(copter.curr_gps_week_ms.time_week > (uint16_t)id_para.serial[3])
+					{
+						result = MAV_RESULT_DENIED;
+					}
+					else
+					{
+						if(copter.curr_gps_week_ms.time_week == (uint16_t)id_para.serial[3])
+						{
+							if(copter.curr_gps_week_ms.time_week_ms > (uint32_t)id_para.serial[4])
+							{
+								result = MAV_RESULT_DENIED;
+							}
+						}
+					}
+				}
+			}
+			break;
+		}
+	//		added end	
+	//	added end
+		default:
+		{
+			break;
+		}
+	}
+
+	return result;		
+}
+

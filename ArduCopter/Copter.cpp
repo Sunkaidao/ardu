@@ -457,6 +457,70 @@ void Copter::one_hz_loop()
 
     // init compass location for declination
     init_compass_location();
+
+	/*char sysid[40];
+	//hal.util->get_system_id(sysid);
+
+	gcs().send_text(MAV_SEVERITY_INFO, "1. %x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x%x",	 \
+			  (unsigned)sysid[6],  (unsigned)sysid[7],	 (unsigned)sysid[8],	 (unsigned)sysid[9],	 (unsigned)sysid[10], (unsigned)sysid[11],	 (unsigned)sysid[12], (unsigned)sysid[13], \
+			  (unsigned)sysid[15], (unsigned)sysid[16],	 (unsigned)sysid[17],	 (unsigned)sysid[18],	 (unsigned)sysid[19], (unsigned)sysid[20],	 (unsigned)sysid[21], (unsigned)sysid[22], \
+			  (unsigned)sysid[24], (unsigned)sysid[25],	 (unsigned)sysid[26],	 (unsigned)sysid[27],	 (unsigned)sysid[28], (unsigned)sysid[29],	 (unsigned)sysid[30], (unsigned)sysid[31]);
+	
+	userhook_init();
+	*/
+
+	//uint8_t lcl_cnt;
+#if FXTX_AUTH == ENABLED
+	//	modidied by zhangyong to make sure gps fix is durable
+	if((false == curr_gps_week_ms.time_week_settled) &&\
+		(gps.status() >=	AP_GPS::GPS_OK_FIX_3D) && \
+		(gps.get_hdop() <= g.gps_hdop_good) && \
+		(gps.num_sats() >= ahrs.get_gps_minsats()))
+	//	modified end			
+	{
+		//	added for debug 20161110
+		
+		//	added end
+		curr_gps_week_ms.time_week_settled = true;
+		curr_gps_week_ms.time_week = gps.time_week();
+		curr_gps_week_ms.time_week_ms = gps.time_week_ms();
+
+		//	added by zhangyong for debug
+//		printf("week %d\n", gps.time_week());
+//		printf("week_ms %d\n", gps.time_week_ms());
+
+	
+	}	
+
+//	gcs().send_text(MAV_SEVERITY_INFO, "1. auth_state_ms = %d", auth_result_ms);
+//	gcs().send_text(MAV_SEVERITY_INFO, "1. auth_state_timeout_cnt = %d", auth_state_timeout_cnt);
+
+	//	added by zhangyong to make clear the auth state 20180612
+	if(auth_state_up_auth == auth_state_ms)
+	{	
+		
+		
+		if(auth_state_timeout_cnt >= 2)
+		{
+			auth_state_timeout_cnt = 0;
+			auth_result_ms = auth_result_failed;
+			auth_state_ms = auth_state_initialize;
+			AP_Notify::events.tune_next = auth_result_ms + 1;
+		}
+
+		auth_state_timeout_cnt++;
+	
+}
+
+//	gcs().send_text(MAV_SEVERITY_INFO, "2. auth_state_ms = %d", auth_result_ms);
+//	gcs().send_text(MAV_SEVERITY_INFO, "2. auth_state_timeout_cnt = %d", auth_state_timeout_cnt);
+	//	
+
+//	printf("A. %d, %d, %d, &%d\n", gps.status(), curr_gps_week_ms.time_week, gps.time_week_ms(), &curr_gps_week_ms);
+#endif
+
+
+	
 }
 
 // called at 50hz
@@ -589,6 +653,7 @@ void Copter::publish_osd_info()
     osd.set_nav_info(nav_info);
 }
 #endif
+
 
 /*
   constructor for main Copter class

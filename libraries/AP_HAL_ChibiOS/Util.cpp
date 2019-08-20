@@ -26,6 +26,12 @@
 #include <AP_ROMFS/AP_ROMFS.h>
 #include "sdcard.h"
 
+//	added by zhangyong for auth 20190819
+#include <GCS_MAVLink/GCS_MAVLink.h>
+#include <GCS_MAVLink/GCS.h>
+//	added end
+
+
 #if HAL_WITH_IO_MCU
 #include <AP_BoardConfig/AP_BoardConfig.h>
 #include <AP_IOMCU/AP_IOMCU.h>
@@ -293,6 +299,12 @@ bool Util::get_system_id(char buf[40])
              (unsigned)serialid[7], (unsigned)serialid[6], (unsigned)serialid[5], (unsigned)serialid[4], 
              (unsigned)serialid[11], (unsigned)serialid[10], (unsigned)serialid[9],(unsigned)serialid[8]);
     buf[39] = 0;
+
+	//	added by zhangyong for auth 20190819
+	//gcs().send_text(MAV_SEVERITY_INFO, "%s", board_name);
+	//gcs().send_text(MAV_SEVERITY_INFO, buf);
+	//	added end
+	
     return true;
 }
 

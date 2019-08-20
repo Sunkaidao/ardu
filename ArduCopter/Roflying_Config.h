@@ -62,7 +62,7 @@
 // Put your variable definitions into the UserVariables.h file (or another file name and then change the #define below).
 //#define USERHOOK_VARIABLES "UserVariables.h"
 // Put your custom code into the UserCode.cpp with function names matching those listed below and ensure the appropriate #define below is uncommented below
-//#define USERHOOK_INIT userhook_init();                      // for code to be run once at startup
+#define USERHOOK_INIT userhook_init();                      // for code to be run once at startup
 //#define USERHOOK_FASTLOOP userhook_FastLoop();            // for code to be run at 100hz
 //#define USERHOOK_50HZLOOP userhook_50Hz();                  // for code to be run at 50hz
 //#define USERHOOK_MEDIUMLOOP userhook_MediumLoop();        // for code to be run at 10hz
@@ -70,3 +70,49 @@
 //#define USERHOOK_SUPERSLOWLOOP userhook_SuperSlowLoop();  // for code to be run at 1hz
 //#define USERHOOK_AUXSWITCH ENABLED                        // for code to handle user aux switches
 //#define USER_PARAMS_ENABLED ENABLED                       // to enable user parameters
+
+
+//	added by zhangYong 20161109 for auth
+//////////////////////////////////////////////////////////////////////////////
+// AUTH ()
+//
+
+#ifndef FXTX_AUTH
+ #define FXTX_AUTH 	ENABLED
+#endif
+
+#if FXTX_AUTH == ENABLED
+#define AUTH_KEY_POS	0
+#define AUTH_KEY_LEN	10
+#define AUTH_ID_POS		(AUTH_KEY_POS + AUTH_KEY_LEN)
+#define AUTH_ID_LEN		40
+#define AUTH_ENTER_POS	(AUTH_ID_POS + AUTH_ID_LEN)
+#define AUTH_ID_ARRAY_LEN	(AUTH_ENTER_POS + 4)
+
+enum auth_result { 
+  auth_result_failed = 0, 
+  auth_result_denied = 1, 
+  auth_result_success = 2 
+};
+
+enum auth_state {
+	auth_state_initialize = 0, 
+	auth_state_up_whoami = 1, 
+	auth_state_up_auth = 2, 
+	auth_state_done = 3 
+};
+
+union auth_id_para {
+	float	serial[5];
+	uint8_t 	 data[20];
+};
+
+//	added by ZhangYong globle variable
+struct current_gps_week_ms
+{
+	bool 	time_week_settled;
+	uint32_t time_week_ms;              ///< GPS time (milliseconds from start of GPS week)
+	uint16_t time_week;                 ///< GPS week number
+};
+
+#endif

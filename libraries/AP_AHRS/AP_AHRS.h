@@ -566,6 +566,10 @@ public:
     // in input, x is forward, y is right
     Vector2f rotate_body_to_earth2D(const Vector2f &bf) const;
 
+	//	added by zhangyong for system tiem set to avoid gps glitch 20180802
+	uint8_t get_gps_minsats() {return _gps_minsats;}
+	//	added end
+
     virtual void update_AOA_SSA(void);
 
     // get_hgt_ctrl_limit - get maximum height to be observed by the
