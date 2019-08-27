@@ -82,7 +82,7 @@ void GCS_MAVLINK_Rover::send_position_target_global_int()
     mavlink_msg_position_target_global_int_send(
         chan,
         AP_HAL::millis(), // time_boot_ms
-        MAV_FRAME_GLOBAL_INT, // targets are always global altitude
+        MAV_FRAME_GLOBAL, // targets are always global altitude
         0xFFF8, // ignore everything except the x/y/z components
         target.lat, // latitude as 1e7
         target.lng, // longitude as 1e7
@@ -192,7 +192,7 @@ void GCS_MAVLINK_Rover::send_pid_tuning()
     if (g.gcs_pid_mask & 1) {
         pid_info = &g2.attitude_control.get_steering_rate_pid().get_pid_info();
         mavlink_msg_pid_tuning_send(chan, PID_TUNING_STEER,
-                                    degrees(pid_info->desired),
+                                    degrees(pid_info->target),
                                     degrees(ahrs.get_yaw_rate_earth()),
                                     pid_info->FF,
                                     pid_info->P,
@@ -209,7 +209,7 @@ void GCS_MAVLINK_Rover::send_pid_tuning()
         float speed = 0.0f;
         g2.attitude_control.get_forward_speed(speed);
         mavlink_msg_pid_tuning_send(chan, PID_TUNING_ACCZ,
-                                    pid_info->desired,
+                                    pid_info->target,
                                     speed,
                                     0,
                                     pid_info->P,
@@ -224,7 +224,7 @@ void GCS_MAVLINK_Rover::send_pid_tuning()
     if (g.gcs_pid_mask & 4) {
         pid_info = &g2.attitude_control.get_pitch_to_throttle_pid().get_pid_info();
         mavlink_msg_pid_tuning_send(chan, PID_TUNING_PITCH,
-                                    degrees(pid_info->desired),
+                                    degrees(pid_info->target),
                                     degrees(ahrs.pitch),
                                     pid_info->FF,
                                     pid_info->P,
@@ -239,7 +239,7 @@ void GCS_MAVLINK_Rover::send_pid_tuning()
     if (g.gcs_pid_mask & 8) {
         pid_info = &g2.wheel_rate_control.get_pid(0).get_pid_info();
         mavlink_msg_pid_tuning_send(chan, 7,
-                                    pid_info->desired,
+                                    pid_info->target,
                                     pid_info->actual,
                                     pid_info->FF,
                                     pid_info->P,
@@ -254,7 +254,7 @@ void GCS_MAVLINK_Rover::send_pid_tuning()
     if (g.gcs_pid_mask & 16) {
         pid_info = &g2.wheel_rate_control.get_pid(1).get_pid_info();
         mavlink_msg_pid_tuning_send(chan, 8,
-                                    pid_info->desired,
+                                    pid_info->target,
                                     pid_info->actual,
                                     pid_info->FF,
                                     pid_info->P,
@@ -269,7 +269,7 @@ void GCS_MAVLINK_Rover::send_pid_tuning()
     if (g.gcs_pid_mask & 32) {
         pid_info = &g2.attitude_control.get_sailboat_heel_pid().get_pid_info();
         mavlink_msg_pid_tuning_send(chan, 9,
-                                    pid_info->desired,
+                                    pid_info->target,
                                     pid_info->actual,
                                     pid_info->FF,
                                     pid_info->P,
@@ -332,6 +332,18 @@ bool GCS_MAVLINK_Rover::try_send_message(enum ap_message id)
         rover.g2.windvane.send_wind(chan);
         break;
 
+    case MSG_ADSB_VEHICLE: {
+        AP_OADatabase *oadb = AP::oadatabase();
+        if (oadb != nullptr) {
+            CHECK_PAYLOAD_SIZE(ADSB_VEHICLE);
+            uint16_t interval_ms = 0;
+            if (get_ap_message_interval(id, interval_ms)) {
+                oadb->send_adsb_vehicle(chan, interval_ms);
+            }
+        }
+        break;
+    }
+
     default:
         return GCS_MAVLINK::try_send_message(id);
     }
@@ -348,7 +360,7 @@ void GCS_MAVLINK_Rover::packetReceived(const mavlink_status_t &status, const mav
 /*
   default stream rates to 1Hz
  */
-const AP_Param::GroupInfo GCS_MAVLINK::var_info[] = {
+const AP_Param::GroupInfo GCS_MAVLINK_Parameters::var_info[] = {
     // @Param: RAW_SENS
     // @DisplayName: Raw sensor stream rate
     // @Description: Raw sensor stream rate to ground station
@@ -356,7 +368,7 @@ const AP_Param::GroupInfo GCS_MAVLINK::var_info[] = {
     // @Range: 0 10
     // @Increment: 1
     // @User: Advanced
-    AP_GROUPINFO("RAW_SENS", 0, GCS_MAVLINK, streamRates[0],  1),
+    AP_GROUPINFO("RAW_SENS", 0, GCS_MAVLINK_Parameters, streamRates[0],  1),
 
     // @Param: EXT_STAT
     // @DisplayName: Extended status stream rate to ground station
@@ -365,7 +377,7 @@ const AP_Param::GroupInfo GCS_MAVLINK::var_info[] = {
     // @Range: 0 10
     // @Increment: 1
     // @User: Advanced
-    AP_GROUPINFO("EXT_STAT", 1, GCS_MAVLINK, streamRates[1],  1),
+    AP_GROUPINFO("EXT_STAT", 1, GCS_MAVLINK_Parameters, streamRates[1],  1),
 
     // @Param: RC_CHAN
     // @DisplayName: RC Channel stream rate to ground station
@@ -374,7 +386,7 @@ const AP_Param::GroupInfo GCS_MAVLINK::var_info[] = {
     // @Range: 0 10
     // @Increment: 1
     // @User: Advanced
-    AP_GROUPINFO("RC_CHAN",  2, GCS_MAVLINK, streamRates[2],  1),
+    AP_GROUPINFO("RC_CHAN",  2, GCS_MAVLINK_Parameters, streamRates[2],  1),
 
     // @Param: RAW_CTRL
     // @DisplayName: Raw Control stream rate to ground station
@@ -383,7 +395,7 @@ const AP_Param::GroupInfo GCS_MAVLINK::var_info[] = {
     // @Range: 0 10
     // @Increment: 1
     // @User: Advanced
-    AP_GROUPINFO("RAW_CTRL", 3, GCS_MAVLINK, streamRates[3],  1),
+    AP_GROUPINFO("RAW_CTRL", 3, GCS_MAVLINK_Parameters, streamRates[3],  1),
 
     // @Param: POSITION
     // @DisplayName: Position stream rate to ground station
@@ -392,7 +404,7 @@ const AP_Param::GroupInfo GCS_MAVLINK::var_info[] = {
     // @Range: 0 10
     // @Increment: 1
     // @User: Advanced
-    AP_GROUPINFO("POSITION", 4, GCS_MAVLINK, streamRates[4],  1),
+    AP_GROUPINFO("POSITION", 4, GCS_MAVLINK_Parameters, streamRates[4],  1),
 
     // @Param: EXTRA1
     // @DisplayName: Extra data type 1 stream rate to ground station
@@ -401,7 +413,7 @@ const AP_Param::GroupInfo GCS_MAVLINK::var_info[] = {
     // @Range: 0 10
     // @Increment: 1
     // @User: Advanced
-    AP_GROUPINFO("EXTRA1",   5, GCS_MAVLINK, streamRates[5],  1),
+    AP_GROUPINFO("EXTRA1",   5, GCS_MAVLINK_Parameters, streamRates[5],  1),
 
     // @Param: EXTRA2
     // @DisplayName: Extra data type 2 stream rate to ground station
@@ -410,7 +422,7 @@ const AP_Param::GroupInfo GCS_MAVLINK::var_info[] = {
     // @Range: 0 10
     // @Increment: 1
     // @User: Advanced
-    AP_GROUPINFO("EXTRA2",   6, GCS_MAVLINK, streamRates[6],  1),
+    AP_GROUPINFO("EXTRA2",   6, GCS_MAVLINK_Parameters, streamRates[6],  1),
 
     // @Param: EXTRA3
     // @DisplayName: Extra data type 3 stream rate to ground station
@@ -419,7 +431,7 @@ const AP_Param::GroupInfo GCS_MAVLINK::var_info[] = {
     // @Range: 0 10
     // @Increment: 1
     // @User: Advanced
-    AP_GROUPINFO("EXTRA3",   7, GCS_MAVLINK, streamRates[7],  1),
+    AP_GROUPINFO("EXTRA3",   7, GCS_MAVLINK_Parameters, streamRates[7],  1),
 
     // @Param: PARAMS
     // @DisplayName: Parameter stream rate to ground station
@@ -428,7 +440,17 @@ const AP_Param::GroupInfo GCS_MAVLINK::var_info[] = {
     // @Range: 0 10
     // @Increment: 1
     // @User: Advanced
-    AP_GROUPINFO("PARAMS",   8, GCS_MAVLINK, streamRates[8],  10),
+    AP_GROUPINFO("PARAMS",   8, GCS_MAVLINK_Parameters, streamRates[8],  10),
+
+    // @Param: ADSB
+    // @DisplayName: ADSB stream rate to ground station
+    // @Description: ADSB stream rate to ground station
+    // @Units: Hz
+    // @Range: 0 50
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("ADSB",   9, GCS_MAVLINK_Parameters, streamRates[9],  0),
+
     AP_GROUPEND
 };
 
@@ -497,6 +519,9 @@ static const ap_message STREAM_EXTRA3_msgs[] = {
 static const ap_message STREAM_PARAMS_msgs[] = {
     MSG_NEXT_PARAM
 };
+static const ap_message STREAM_ADSB_msgs[] = {
+    MSG_ADSB_VEHICLE
+};
 
 const struct GCS_MAVLINK::stream_entries GCS_MAVLINK::all_stream_entries[] = {
     MAV_STREAM_ENTRY(STREAM_RAW_SENSORS),
@@ -507,6 +532,7 @@ const struct GCS_MAVLINK::stream_entries GCS_MAVLINK::all_stream_entries[] = {
     MAV_STREAM_ENTRY(STREAM_EXTRA1),
     MAV_STREAM_ENTRY(STREAM_EXTRA2),
     MAV_STREAM_ENTRY(STREAM_EXTRA3),
+    MAV_STREAM_ENTRY(STREAM_ADSB),
     MAV_STREAM_ENTRY(STREAM_PARAMS),
     MAV_STREAM_TERMINATOR // must have this at end of stream_entries
 };
@@ -640,8 +666,8 @@ MAV_RESULT GCS_MAVLINK_Rover::handle_command_long_packet(const mavlink_command_l
         // param2 : throttle type (0=throttle percentage, 1=PWM, 2=pilot throttle channel pass-through. See MOTOR_TEST_THROTTLE_TYPE enum)
         // param3 : throttle (range depends upon param2)
         // param4 : timeout (in seconds)
-        return rover.mavlink_motor_test_start(chan,
-                                              static_cast<uint8_t>(packet.param1),
+        return rover.mavlink_motor_test_start(*this,
+                                              (AP_MotorsUGV::motor_test_order)packet.param1,
                                               static_cast<uint8_t>(packet.param2),
                                               static_cast<int16_t>(packet.param3),
                                               packet.param4);
@@ -1043,9 +1069,6 @@ uint64_t GCS_MAVLINK_Rover::capabilities() const
 void Rover::mavlink_delay_cb()
 {
     static uint32_t last_1hz, last_50hz, last_5s;
-    if (!gcs().chan(0).initialised) {
-        return;
-    }
 
     // don't allow potentially expensive logging calls:
     logger.EnableWrites(false);

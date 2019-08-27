@@ -463,6 +463,11 @@ bool NavEKF2_core::readDeltaVelocity(uint8_t ins_index, Vector3f &dVel, float &d
 // check for new valid GPS data and update stored measurement if available
 void NavEKF2_core::readGpsData()
 {
+    if (frontend->_fusionModeGPS == 3) {
+        // don't read GPS data if GPS usage disabled
+        return;
+    }
+
     // check for new GPS data
     // do not accept data at a faster rate than 14Hz to avoid overflowing the FIFO buffer
     const AP_GPS &gps = AP::gps();
@@ -547,12 +552,17 @@ void NavEKF2_core::readGpsData()
             // Post-alignment checks
             calcGpsGoodForFlight();
 
+            // see if we can get origin from frontend
+            if (!validOrigin && frontend->common_origin_valid) {
+                setOrigin(frontend->common_EKF_origin);
+            }
+
             // Read the GPS location in WGS-84 lat,long,height coordinates
             const struct Location &gpsloc = gps.location();
 
             // Set the EKF origin and magnetic field declination if not previously set  and GPS checks have passed
             if (gpsGoodToAlign && !validOrigin) {
-                setOrigin();
+                setOrigin(gpsloc);
 
                 // set the NE earth magnetic field states using the published declination
                 // and set the corresponding variances and covariances

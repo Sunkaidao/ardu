@@ -514,7 +514,6 @@ is bob we will attempt to checkout bob-AVR'''
 
     def common_boards(self):
         '''returns list of boards common to all vehicles'''
-        # note that while we do not use these for AntennaTracker!
         return ["fmuv2",
                 "fmuv3",
                 "fmuv4",
@@ -534,6 +533,7 @@ is bob we will attempt to checkout bob-AVR'''
                 "MatekF765-Wing",
                 "OMNIBUSF7V2",
                 "sparky2",
+                "omnibusf4",
                 "omnibusf4pro",
                 "omnibusf4v6",
                 "OmnibusNanoV6",
@@ -561,7 +561,7 @@ is bob we will attempt to checkout bob-AVR'''
                 "VRCore-v10",
                 "VRBrain-v54",
                 "TBS-Colibri-F7",
-                "Pixhawk6",
+                "Durandal",
                 "CubeOrange",
                 "CubeYellow",
                 # SITL targets
@@ -673,6 +673,10 @@ is bob we will attempt to checkout bob-AVR'''
             self.progress("Removing (%s)" % (self.tmpdir,))
             shutil.rmtree(self.tmpdir)
 
+    def buildlogs_dirpath(self):
+        return os.getenv("BUILDLOGS",
+                         os.path.join(os.getcwd(), "..", "buildlogs"))
+
     def run(self):
         self.validate()
 
@@ -706,8 +710,7 @@ is bob we will attempt to checkout bob-AVR'''
 
         self.mkpath(os.path.join("binaries", self.hdate_ym,
                                  self.hdate_ymdhm))
-        self.binaries = os.path.join(os.getcwd(), "..", "buildlogs",
-                                     "binaries")
+        self.binaries = os.path.join(self.buildlogs_dirpath(), "binaries")
         self.basedir = os.getcwd()
         self.error_strings = []
 

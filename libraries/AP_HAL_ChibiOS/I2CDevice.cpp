@@ -22,6 +22,7 @@
 
 #include "Scheduler.h"
 #include "hwdef/common/stm32_util.h"
+#include <AP_InternalError/AP_InternalError.h>
 
 #include "ch.h"
 #include "hal.h"
@@ -247,7 +248,7 @@ bool I2CDevice::_transfer(const uint8_t *send, uint32_t send_len,
     for(uint8_t i=0 ; i <= _retries; i++) {
         int ret;
         // calculate a timeout as twice the expected transfer time, and set as min of 4ms
-        uint32_t timeout_ms = 1+2*(((8*1000000UL/bus.busclock)*MAX(send_len, recv_len))/1000);
+        uint32_t timeout_ms = 1+2*(((8*1000000UL/bus.busclock)*(send_len+recv_len))/1000);
         timeout_ms = MAX(timeout_ms, _timeout_ms);
 
         // we get the lock and start the bus inside the retry loop to
@@ -271,9 +272,17 @@ bool I2CDevice::_transfer(const uint8_t *send, uint32_t send_len,
 
         i2cSoftStop(I2CD[bus.busnum].i2c);
         osalDbgAssert(I2CD[bus.busnum].i2c->state == I2C_STOP, "i2cStart state");
-        
+
         bus.dma_handle->unlock();
         
+        if (I2CD[bus.busnum].i2c->errors & I2C_ISR_LIMIT) {
+            AP::internalerror().error(AP_InternalError::error_t::i2c_isr);
+            break;
+        }
+
+        AP_HAL::Util::PersistentData &pd = hal.util->persistent_data;
+        pd.i2c_isr_count += I2CD[bus.busnum].i2c->isr_count;
+
         if (ret == MSG_OK) {
             bus.bouncebuffer_finish(send, recv, recv_len);
             i2cReleaseBus(I2CD[bus.busnum].i2c);

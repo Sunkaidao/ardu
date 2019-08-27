@@ -52,8 +52,7 @@ void Copter::init_ardupilot()
     serial_manager.init();
 
     // setup first port early to allow BoardConfig to report errors
-    gcs().chan(0).setup_uart(0);
-
+    gcs().setup_console();
 
     // Register mavlink_delay_cb, which will run anytime you have
     // more than 5ms remaining in your call to hal.scheduler->delay
@@ -147,6 +146,10 @@ void Copter::init_ardupilot()
 #if AP_TERRAIN_AVAILABLE && AC_TERRAIN
     Location::set_terrain(&terrain);
     wp_nav->set_terrain(&terrain);
+#endif
+
+#if AC_OAPATHPLANNER_ENABLED == ENABLED
+    g2.oa.init();
 #endif
 
     attitude_control->parameter_sanity_check();
@@ -255,6 +258,10 @@ void Copter::init_ardupilot()
 
     // flag that initialisation has completed
     ap.initialised = true;
+
+#if AP_PARAM_KEY_DUMP
+    AP_Param::show_all(hal.console, true);
+#endif
 }
 
 
@@ -546,7 +553,11 @@ void Copter::allocate_motors(void)
     }
     AP_Param::load_object_from_eeprom(pos_control, pos_control->var_info);
 
+#if AC_OAPATHPLANNER_ENABLED == ENABLED
+    wp_nav = new AC_WPNav_OA(inertial_nav, *ahrs_view, *pos_control, *attitude_control);
+#else
     wp_nav = new AC_WPNav(inertial_nav, *ahrs_view, *pos_control, *attitude_control);
+#endif
     if (wp_nav == nullptr) {
         AP_HAL::panic("Unable to allocate WPNav");
     }
@@ -580,7 +591,7 @@ void Copter::allocate_motors(void)
         attitude_control->get_rate_yaw_pid().kI().set_default(0.015);
         break;
     case AP_Motors::MOTOR_FRAME_TRI:
-        attitude_control->get_rate_yaw_pid().filt_hz().set_default(100);
+        attitude_control->get_rate_yaw_pid().filt_D_hz().set_default(100);
         break;
     default:
         break;

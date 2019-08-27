@@ -394,7 +394,7 @@ void Mode::navigate_to_waypoint()
     desired_speed = calc_speed_nudge(desired_speed, g2.wp_nav.get_reversed());
     calc_throttle(desired_speed, true);
 
-    float desired_heading_cd = g2.wp_nav.wp_bearing_cd();
+    float desired_heading_cd = g2.wp_nav.oa_wp_bearing_cd();
     if (g2.sailboat.use_indirect_route(desired_heading_cd)) {
         // sailboats use heading controller when tacking upwind
         desired_heading_cd = g2.sailboat.calc_heading(desired_heading_cd);
@@ -408,13 +408,6 @@ void Mode::navigate_to_waypoint()
 // calculate steering output given a turn rate and speed
 void Mode::calc_steering_from_turn_rate(float turn_rate, float speed, bool reversed)
 {
-    // add obstacle avoidance response to lateral acceleration target
-    // ToDo: replace this type of object avoidance with path planning
-    if (!reversed) {
-        const float lat_accel_adj = (rover.obstacle.turn_angle / 45.0f) * g.turn_max_g;
-        turn_rate += attitude_control.get_turn_rate_from_lat_accel(lat_accel_adj, speed);
-    }
-
     // calculate and send final steering command to motor library
     const float steering_out = attitude_control.get_steering_out_rate(turn_rate,
                                                                       g2.motors.limit.steer_left,
@@ -428,12 +421,6 @@ void Mode::calc_steering_from_turn_rate(float turn_rate, float speed, bool rever
 */
 void Mode::calc_steering_from_lateral_acceleration(float lat_accel, bool reversed)
 {
-    // add obstacle avoidance response to lateral acceleration target
-    // ToDo: replace this type of object avoidance with path planning
-    if (!reversed) {
-        lat_accel += (rover.obstacle.turn_angle / 45.0f) * g.turn_max_g;
-    }
-
     // constrain to max G force
     lat_accel = constrain_float(lat_accel, -g.turn_max_g * GRAVITY_MSS, g.turn_max_g * GRAVITY_MSS);
 

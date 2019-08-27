@@ -108,6 +108,7 @@ public:
         k_param_rc_channels,
         k_param_servo_channels,
 
+        k_param_stats = 218,
         k_param_scripting = 219,
 
         //
@@ -170,8 +171,8 @@ public:
     AC_PID         pidYaw2Srv;
 
     Parameters() :
-        pidPitch2Srv(0.2, 0, 0.05f, 4000.0f, 0.1, 0.02f),
-        pidYaw2Srv  (0.2, 0, 0.05f, 4000.0f, 0.1, 0.02f)
+        pidPitch2Srv(0.2, 0.0f, 0.05f, 0.02f, 4000.0f, 0.0f, 0.0f, 0.0f, 0.1f),
+        pidYaw2Srv  (0.2, 0.0f, 0.05f, 0.02f, 4000.0f, 0.0f, 0.0f, 0.0f, 0.1f)
         {}
 };
 
