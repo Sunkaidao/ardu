@@ -175,7 +175,11 @@ void AP_BoardLED2::update(void)
                 if ((counter2 & 0x3) == 0) {
                     hal.gpio->toggle(HAL_GPIO_A_LED_PIN);
                 }
-            } else {
+            }else if(AP_Notify::flags.failsafe_gps_yaw){//   blink fast (around 4Hz)
+                if ((counter2 & 0x3) == 0) {
+                    hal.gpio->toggle(HAL_GPIO_A_LED_PIN);
+                }
+			}else {
                 // ARM led solid
                 hal.gpio->write(HAL_GPIO_A_LED_PIN, HAL_GPIO_LED_ON);
             }

@@ -735,6 +735,7 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_long_packet(const mavlink_command_
                                                packet.param4,
                                                (uint8_t)packet.param5);
 
+
 #if WINCH_ENABLED == ENABLED
     case MAV_CMD_DO_WINCH:
         // param1 : winch number (ignored)
@@ -847,10 +848,63 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_long_packet(const mavlink_command_
         return MAV_RESULT_ACCEPTED;
     }
 
+	case MAV_CMD_AUTH_PROTOCAL:
+	{
+		return copter.handle_command_auth_protoca_ahead(packet);
+
+	}
+		
+
     default:
         return GCS_MAVLINK::handle_command_long_packet(packet);
     }
 }
+
+
+
+
+
+void GCS_MAVLINK_Copter::handle_command_auth_protoca_post(const mavlink_command_long_t &packet, MAV_RESULT result)
+{
+	if(MAV_CMD_AUTH_PROTOCAL == packet.command)
+   	{
+
+		if(auth_state_up_whoami == copter.auth_state_ms)
+		{
+			gcs().send_statustext(MAV_SEVERITY_CRITICAL, 0xFF, copter.auth_msg);
+			copter.auth_state_ms = auth_state_up_auth;
+						//	begin to count for timeout
+						//auth_state_timeout_switch = 1;
+			copter.auth_state_timeout_cnt = 0;
+		}
+		else if(auth_state_done == copter.auth_state_ms)
+		{
+			copter.auth_state_ms = auth_state_initialize;
+				
+    		if(MAV_RESULT_FAILED == result)
+    		{
+    			copter.auth_result_ms = auth_result_failed;
+			}
+			else if(MAV_RESULT_DENIED == result)
+			{
+				copter.auth_result_ms = auth_result_denied;
+			}
+			else
+			{
+				copter.auth_result_ms = auth_result_success;
+			}
+
+			//static uint8_t lcl_cnt;
+			//	added by zhangyong to make clear the process of accessing 20180612
+			AP_Notify::events.tune_next = copter.auth_result_ms + 1;
+
+			//printf("%d: %d\n", lcl_cnt, AP_Notify::events.tune_next);
+			//	added end
+
+		}
+   	}
+}
+
 
 void GCS_MAVLINK_Copter::handle_mount_message(const mavlink_message_t &msg)
 {
@@ -874,10 +928,68 @@ void GCS_MAVLINK_Copter::handle_mount_message(const mavlink_message_t &msg)
 
 void GCS_MAVLINK_Copter::handleMessage(const mavlink_message_t &msg)
 {
+
+#if FXTX_AUTH == 1
+	MAV_RESULT result = MAV_RESULT_FAILED;
+
+	if(copter.auth_result_ms != auth_result_success)
+	{
+
+		
+	/*	gcs().send_text(MAV_SEVERITY_INFO, "1. %.2x%.2x%.2x%.2x %.2x%.2x%.2x%.2x %.2x%.2x%.2x%.2x",	 \
+			  (unsigned)copter.auth_id[0], (unsigned)copter.auth_id[1], \
+			  (unsigned)copter.auth_id[2], (unsigned)copter.auth_id[3], \
+			  (unsigned)copter.auth_id[4], (unsigned)copter.auth_id[5],	\
+			  (unsigned)copter.auth_id[6], (unsigned)copter.auth_id[7], \
+			  (unsigned)copter.auth_id[8], (unsigned)copter.auth_id[9],	\
+			  (unsigned)copter.auth_id[10],	(unsigned)copter.auth_id[11]);	
+	*/
+		
+	
+		switch (msg.msgid) 
+		{
+			case MAVLINK_MSG_ID_HEARTBEAT:		// MAV ID: 0
+			{
+	//			static uint32_t last_time_ms;
+	//			printf("MAVLINK_MSG_ID_HEARTBEAT %d\n", AP_HAL::millis() - last_time_ms);
+	//			printf("msg->sysid %d vs copter.g.sysid_my_gcs %d\n", msg->sysid, copter.g.sysid_my_gcs);
+	
+				// We keep track of the last time we received a heartbeat from our GCS for failsafe purposes
+				if(msg.sysid != copter.g.sysid_my_gcs) break;
+				copter.failsafe.last_heartbeat_ms = AP_HAL::millis();
+		
+	//			last_time_ms = AP_HAL::millis();
+				break;
+			}
+	
+			case MAVLINK_MSG_ID_COMMAND_LONG:		// MAV ID: 76
+			{
+				// decode packet
+				mavlink_command_long_t packet;
+				mavlink_msg_command_long_decode(&msg, &packet);
+				
+				result = copter.handle_command_auth_protoca_ahead(packet);
+	
+				// send ACK or NAK
+				mavlink_msg_command_ack_send(chan, packet.command, result);
+			
+				handle_command_auth_protoca_post(packet, result);
+			}
+			default:
+			{
+				break;
+			}
+			
+		}
+		 return;
+	}
+#endif	
+
     switch (msg.msgid) {
 
     case MAVLINK_MSG_ID_HEARTBEAT:      // MAV ID: 0
     {
+
         // We keep track of the last time we received a heartbeat from our GCS for failsafe purposes
         if(msg.sysid != copter.g.sysid_my_gcs) break;
         copter.failsafe.last_heartbeat_ms = AP_HAL::millis();
@@ -1303,6 +1415,8 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_flight_termination(const mavlink_command_l
 
     return result;
 }
+
+
 
 bool GCS_MAVLINK_Copter::set_mode(const uint8_t mode)
 {

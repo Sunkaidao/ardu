@@ -31,6 +31,8 @@
 #include <AP_RangeFinder/AP_RangeFinder.h>
 #include <AP_Logger/LogStructure.h>
 
+#define GPS_YAW_EKF_ENABLED  1
+
 class NavEKF2_core;
 class AP_AHRS;
 
@@ -236,6 +238,20 @@ public:
     */
     bool getRangeBeaconDebug(int8_t instance, uint8_t &ID, float &rng, float &innov, float &innovVar, float &testRatio, Vector3f &beaconPosNED, float &offsetHigh, float &offsetLow) const;
 
+    /*
+     * Writes the measurement from a yaw angle sensor
+     *
+     * yawAngle: Yaw angle of the vehicle relative to true north in radians where a positive angle is
+     * produced by a RH rotation about the Z body axis. The Yaw rotation is the first rotation in a
+     * 321 (ZYX) or a 312 (ZXY) rotation sequence as specified by the 'type' argument.
+     * yawAngleErr is the 1SD accuracy of the yaw angle measurement in radians.
+     * timeStamp_ms: System time in msec when the yaw measurement was taken. This time stamp must include
+     * all measurement lag and transmission delays.
+     * type: An integer specifying Euler rotation order used to define the yaw angle.
+     * type = 1 specifies a 312 (ZXY) rotation order, type = 2 specifies a 321 (ZYX) rotation order.
+    */
+    void writeEulerYawAngle(float yawAngle, float yawAngleErr, uint32_t timeStamp_ms, uint8_t type);
+
     // called by vehicle code to specify that a takeoff is happening
     // causes the EKF to compensate for expected barometer errors due to ground effect
     void setTakeoffExpected(bool val);
@@ -355,6 +371,12 @@ public:
     // check if external navigation is being used for yaw observation
     bool isExtNavUsedForYaw(void) const;
 
+    //baiyang added in 20171023
+    int8_t get_ekf_yaw_mode(void){ return _yaw_control.get();}
+    //added end
+
+	bool getIsGpsYawFusion();
+
 private:
     uint8_t num_cores; // number of allocated cores
     uint8_t primary;   // current primary core
@@ -417,6 +439,9 @@ private:
     AP_Int8 _extnavDelay_ms;        // effective average delay of external nav system measurements relative to inertial measurements (msec)
     AP_Int8 _flowUse;               // Controls if the optical flow data is fused into the main navigation estimator and/or the terrain estimator.
     AP_Int16 _mag_ef_limit;         // limit on difference between WMM tables and learned earth field.
+    //biayang added in 20170116
+    AP_Int8 _yaw_control;			// yaw fusion mode control
+    //added end
 
 // Possible values for _flowUse
 #define FLOW_USE_NONE    0
@@ -449,6 +474,7 @@ private:
     const uint16_t gndEffectTimeout_ms = 1000;     // time in msec that ground effect mode is active after being activated
     const float gndEffectBaroScaler = 4.0f;        // scaler applied to the barometer observation variance when ground effect mode is active
     const uint8_t fusionTimeStep_ms = 10;          // The minimum time interval between covariance predictions and measurement fusions in msec
+	const uint8_t sensorIntervalMin_ms = 50;	   // The minimum allowed time between measurements from any non-IMU sensor (msec)
 
     // origin set by one of the cores
     struct Location common_EKF_origin;

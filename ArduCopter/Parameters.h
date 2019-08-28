@@ -372,6 +372,7 @@ public:
 
         // 254,255: reserved
 
+		k_param_failsafe_gps_yaw = 301,
         // the k_param_* space is 9-bits in size
         // 511: reserved
     };
@@ -395,6 +396,7 @@ public:
     AP_Float        rangefinder_gain;
 #endif
 
+    AP_Int8         failsafe_gps_yaw;
     AP_Int8         failsafe_gcs;               // ground station failsafe behavior
     AP_Int16        gps_hdop_good;              // GPS Hdop value at or below this value represent a good position
 

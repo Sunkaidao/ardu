@@ -42,6 +42,11 @@ struct NMEA_detect_state {
     uint8_t ck;
 };
 
+struct NMEA_DA_detect_state { //baiyang added in 20190723
+    uint8_t step;
+    uint8_t ck;
+};
+
 struct SIRF_detect_state {
     uint16_t checksum;
     uint8_t step, payload_length, payload_counter;

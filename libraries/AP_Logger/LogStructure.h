@@ -226,6 +226,7 @@ struct PACKED log_GPA {
     uint8_t  have_vv;
     uint32_t sample_ms;
     uint16_t delta_ms;
+	uint8_t  heading_status; //baiyang added in 20190723
 };
 
 struct PACKED log_Message {
@@ -1201,10 +1202,10 @@ struct PACKED log_Arm_Disarm {
 #define ESC_UNITS "sqvAO-"
 #define ESC_MULTS "FBBBB-"
 
-#define GPA_LABELS "TimeUS,VDop,HAcc,VAcc,SAcc,VV,SMS,Delta"
-#define GPA_FMT   "QCCCCBIH"
-#define GPA_UNITS "smmmn-ss"
-#define GPA_MULTS "FBBBB-CC"
+#define GPA_LABELS "TimeUS,VDop,HAcc,VAcc,SAcc,VV,SMS,Delta,HDs"
+#define GPA_FMT   "QCCCCBIHB"
+#define GPA_UNITS "smmmn-ss-"
+#define GPA_MULTS "FBBBB-CC-"
 
 // see "struct GPS_State" and "Write_GPS":
 #define GPS_LABELS "TimeUS,Status,GMS,GWk,NSats,HDop,Lat,Lng,Alt,Spd,GCrs,VZ,Yaw,U"

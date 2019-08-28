@@ -89,7 +89,7 @@ protected:
     // convenience references to avoid code churn in conversion:
     Parameters &g;
     ParametersG2 &g2;
-    AC_WPNav *&wp_nav;
+	AC_WPNav *&wp_nav;
     AC_Loiter *&loiter_nav;
     AC_PosControl *&pos_control;
     AP_InertialNav &inertial_nav;

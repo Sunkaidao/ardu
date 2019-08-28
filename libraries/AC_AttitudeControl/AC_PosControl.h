@@ -109,6 +109,20 @@ public:
     ///     set force_descend to true during landing to allow target to move low enough to slow the motors
     virtual void set_alt_target_from_climb_rate_ff(float climb_rate_cms, float dt, bool force_descend);
 
+	/// set_alt_target_from_climb_rate - adjusts target up or down using a climb rate in cm/s
+    ///     should be called continuously (with dt set to be the expected time between calls)
+    ///     actual position target will be moved no faster than the speed_down and speed_up
+    ///     target will also be stopped if the motors hit their limits or leash length is exceeded
+    ///     set force_descend to true during landing to allow target to move low enough to slow the motors
+    virtual void set_alt_target_from_climb_rf_rate(float climb_rate_cms, float dt, bool force_descend);
+
+    /// set_alt_target_from_climb_rate_ff - adjusts target up or down using a climb rate in cm/s using feed-forward
+    ///     should be called continuously (with dt set to be the expected time between calls)
+    ///     actual position target will be moved no faster than the speed_down and speed_up
+    ///     target will also be stopped if the motors hit their limits or leash length is exceeded
+    ///     set force_descend to true during landing to allow target to move low enough to slow the motors
+    virtual void set_alt_target_from_climb_rf_rate_ff(float climb_rate_cms, float dt, bool force_descend);
+
     /// add_takeoff_climb_rate - adjusts alt target up or down using a climb rate in cm/s
     ///     should be called continuously (with dt set to be the expected time between calls)
     ///     almost no checks are performed on the input
@@ -190,6 +204,9 @@ public:
 
     /// set_pos_target in cm from home
     void set_pos_target(const Vector3f& position);
+
+	/// set_pos_target in cm from home
+    void set_pos_target_ff(const Vector3f& position);
 
     /// set_xy_target in cm from home
     void set_xy_target(float x, float y);
@@ -297,6 +314,10 @@ public:
     bool pre_arm_checks(const char *param_prefix,
                         char *failure_msg,
                         const uint8_t failure_msg_len);
+
+    void reset_throttle_alt_offset() { _throttle_alt_offset = 0; }
+
+	float get_throttle_alt_offset() { return _throttle_alt_offset; }
 
     static const struct AP_Param::GroupInfo var_info[];
 
@@ -417,4 +438,6 @@ protected:
     // ekf reset handling
     uint32_t    _ekf_xy_reset_ms;      // system time of last recorded ekf xy position reset
     uint32_t    _ekf_z_reset_ms;       // system time of last recorded ekf altitude reset
+
+	float       _throttle_alt_offset;  // 
 };

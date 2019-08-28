@@ -368,6 +368,18 @@ bool AP_Arming_Copter::gps_checks(bool display_failure)
         return false;
     }
 
+	//baiyang added in 20171023
+	if(copter.EKF2.get_ekf_yaw_mode() == 1 && \
+	    !copter.EKF2.getIsGpsYawFusion()){
+	    if (display_failure) {
+            gcs().send_text(MAV_SEVERITY_CRITICAL,"PreArm: Need GPS HEADING locking");
+        }
+		   
+        AP_Notify::flags.pre_arm_gps_check = false;
+        return false;	  
+    }
+    //added end
+
     // check for GPS glitch (as reported by EKF)
     nav_filter_status filt_status;
     if (ahrs.get_filter_status(filt_status)) {
@@ -382,7 +394,8 @@ bool AP_Arming_Copter::gps_checks(bool display_failure)
     Vector3f mag_variance;
     Vector2f offset;
     ahrs.get_variances(vel_variance, pos_variance, hgt_variance, mag_variance, tas_variance, offset);
-    if (mag_variance.length() >= copter.g.fs_ekf_thresh) {
+    if (mag_variance.length() >= copter.g.fs_ekf_thresh && \
+		!copter.EKF2.getIsGpsYawFusion()) {
         check_failed(ARMING_CHECK_NONE, display_failure, "EKF compass variance");
         return false;
     }

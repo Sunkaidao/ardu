@@ -250,6 +250,11 @@ void NavEKF2_core::SelectMagFusion()
     // check for availability of magnetometer data to fuse
     magDataToFuse = storedMag.recall(magDataDelayed,imuDataDelayed.time_ms);
 
+    // baiyang added in 20190723
+	if (isGpsYawFusion){
+        return;
+	}
+
     // Control reset of yaw and magnetic field states if we are using compass data
     if (magDataToFuse && use_compass()) {
         controlMagYawReset();

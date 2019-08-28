@@ -419,6 +419,8 @@ private:
         uint8_t ekf                 : 1; // true if ekf failsafe has occurred
         uint8_t terrain             : 1; // true if the missing terrain data failsafe has occurred
         uint8_t adsb                : 1; // true if an adsb related failsafe has occurred
+
+		uint8_t gps_yaw             : 1; // true if gps yaw lost
     } failsafe;
 
     bool any_failsafe_triggered() const {
@@ -502,6 +504,25 @@ private:
 
     // handle repeated servo and relay events
     AP_ServoRelayEvents ServoRelayEvents;
+
+	
+		//	added end by ZhangYong 20161109
+#if FXTX_AUTH == ENABLED
+		struct current_gps_week_ms curr_gps_week_ms;
+	
+		char	auth_msg[100];
+	
+		char auth_id[AUTH_ID_LEN];
+	
+	//	union auth_id_para id_para;
+	
+		auth_result auth_result_ms = auth_result_failed;
+	
+		auth_state auth_state_ms = auth_state_initialize;
+	
+		uint8_t auth_state_timeout_cnt = 0;
+		//uint8_t auth_state_timeout_switch = 0;
+#endif	
 
     // Camera
 #if CAMERA == ENABLED
@@ -639,6 +660,8 @@ private:
     void set_auto_armed(bool b);
     void set_simple_mode(uint8_t b);
     void set_failsafe_radio(bool b);
+	void set_failsafe_gps_yaw(bool b); //baiyang added in 20180612
+	void check_failsafe_gps_yaw(); //baiyang added in 20190725
     void set_failsafe_gcs(bool b);
     void update_using_interlock();
 
@@ -713,6 +736,8 @@ private:
     void failsafe_radio_on_event();
     void failsafe_radio_off_event();
     void handle_battery_failsafe(const char* type_str, const int8_t action);
+	void failsafe_gps_yaw_on_event(void); //baiyang added in 20180612
+	void failsafe_gps_yaw_off_event(void);//baiyang added in 20180612
     void failsafe_gcs_check();
     void failsafe_gcs_off_event(void);
     void failsafe_terrain_check();
@@ -863,6 +888,7 @@ private:
     const char* get_frame_string();
     void allocate_motors(void);
     bool is_tradheli() const;
+	MAV_RESULT handle_command_auth_protoca_ahead(const mavlink_command_long_t &packet);
 
     // terrain.cpp
     void terrain_update();

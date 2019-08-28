@@ -153,6 +153,20 @@ public:
     // Return true if magnetometer offsets are valid
     bool getMagOffsets(uint8_t mag_idx, Vector3f &magOffsets) const;
 
+    /*
+     * Writes the measurement from a yaw angle sensor
+     *
+     * yawAngle: Yaw angle of the vehicle relative to true north in radians where a positive angle is
+     * produced by a RH rotation about the Z body axis. The Yaw rotation is the first rotation in a
+     * 321 (ZYX) or a 312 (ZXY) rotation sequence as specified by the 'type' argument.
+     * yawAngleErr is the 1SD accuracy of the yaw angle measurement in radians.
+     * timeStamp_ms: System time in msec when the yaw measurement was taken. This time stamp must include
+     * all measurement lag and transmission delays.
+     * type: An integer specifying Euler rotation order used to define the yaw angle.
+     * type = 1 specifies a 312 (ZXY) rotation order, type = 2 specifies a 321 (ZYX) rotation order.
+    */
+    void writeEulerYawAngle(float yawAngle, float yawAngleErr, uint32_t timeStamp_ms, uint8_t type);
+
     // Return the last calculated latitude, longitude and height in WGS-84
     // If a calculated location isn't available, return a raw GPS measurement
     // The status will return true if a calculation or raw measurement is available
@@ -327,6 +341,9 @@ public:
     // return true when external nav data is also being used as a yaw observation
     bool isExtNavUsedForYaw(void);
 
+    // baiyang added in 20190724
+	bool getIsGpsYawFusion() { return isGpsYawFusion;}
+
 private:
     // Reference to the global EKF frontend for parameters
     NavEKF2 *frontend;
@@ -431,6 +448,13 @@ private:
         Vector3f    vel;         // 3..5
         uint32_t    time_ms;     // 6
         uint8_t     sensor_idx;  // 7..9
+    };
+
+    struct yaw_elements {
+        float       yawAng;         // yaw angle measurement (rad)
+        float       yawAngErr;      // yaw angle 1SD measurement accuracy (rad)
+        uint32_t    time_ms;        // measurement timestamp (msec)
+        uint8_t     type;           // type specifiying Euler rotation order used, 1 = 312 (ZXY), 2 = 321 (ZYX)
     };
 
     struct mag_elements {
@@ -777,6 +801,15 @@ private:
 
     // update timing statistics structure
     void updateTimingStatistics(void);
+
+    // 
+	void controlGpsYawReset();
+
+	void alignGpsYaw();
+
+	void SelectGpsYawFusion();
+
+	void fuseGpsEulerYaw();
     
     // Length of FIFO buffers used for non-IMU sensor data.
     // Must be larger than the time period defined by IMU_BUFFER_LENGTH
@@ -1032,6 +1065,22 @@ private:
     float delTimeOF;                // time that delAngBodyOF is summed across
     Vector3f accelPosOffset;        // position of IMU accelerometer unit in body frame (m)
 
+	// yaw sensor fusion
+    uint32_t yawMeasTime_ms;
+    obs_ring_buffer_t<yaw_elements> storedYawAng;
+    yaw_elements yawAngDataNew;
+    yaw_elements yawAngDataDelayed;
+	bool gpsHeadDataToFuse;
+	//baiyang added in 20170117
+    uint32_t lastTimeGpsHeadReceived_ms; // last time we received GPS Head data
+    uint32_t secondLastGpsHeadTime_ms;   // time of second last GPS Head fix used to determine how long since last update
+    //added end
+    //baiyang added in 20180829
+    uint32_t lastTimeGpsHeadLost_ms;       // last time we lost GPS Head data
+    uint32_t prelastTimeGpsHeadReceived_ms; // previous lastTimeGpsHeadReceived_ms
+    bool shouldResetYaw;
+    bool yawControl;
+	bool isGpsYawFusion;
 
     // Range finder
     float baroHgtOffset;                    // offset applied when when switching to use of Baro height

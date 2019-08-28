@@ -440,6 +440,10 @@ void GCS_MAVLINK::handle_mission_request_list(const mavlink_message_t &msg)
     mavlink_mission_request_list_t packet;
     mavlink_msg_mission_request_list_decode(&msg, &packet);
 
+	//gcs().send_text(MAV_SEVERITY_WARNING, "type %d", packet.mission_type);
+
+	//	shielded by zhangyong 20190820, need modify by duqiang
+	packet.mission_type = 0;
     MissionItemProtocol *prot = gcs().get_prot_for_mission_type((MAV_MISSION_TYPE)packet.mission_type);
     if (prot == nullptr) {
         mavlink_msg_mission_ack_send(chan,
@@ -449,6 +453,7 @@ void GCS_MAVLINK::handle_mission_request_list(const mavlink_message_t &msg)
                                      packet.mission_type);
         return;
     }
+	//	shielded end 20190820
 
     prot->handle_mission_request_list(*this, packet, msg);
 }
@@ -2507,6 +2512,7 @@ MAV_RESULT GCS_MAVLINK::handle_flight_termination(const mavlink_command_long_t &
     return MAV_RESULT_FAILED;
 }
 
+
 /*
   handle a R/C bind request (for spektrum)
  */
@@ -2957,6 +2963,9 @@ void GCS_MAVLINK::handle_optical_flow(const mavlink_message_t &msg)
  */
 void GCS_MAVLINK::handle_common_message(const mavlink_message_t &msg)
 {
+
+	//send_text(MAV_SEVERITY_INFO, "%d:%d", chan, msg.msgid);
+	
     switch (msg.msgid) {
     case MAVLINK_MSG_ID_COMMAND_ACK: {
         handle_command_ack(msg);
@@ -3023,6 +3032,8 @@ void GCS_MAVLINK::handle_common_message(const mavlink_message_t &msg)
     case MAVLINK_MSG_ID_MISSION_REQUEST:
     case MAVLINK_MSG_ID_MISSION_ACK:
     case MAVLINK_MSG_ID_MISSION_SET_CURRENT:
+//		gcs().send_text(MAV_SEVERITY_INFO, "%d", msg.msgid);
+	
         handle_common_mission_message(msg);
         break;
 
@@ -3673,6 +3684,11 @@ MAV_RESULT GCS_MAVLINK::handle_command_long_packet(const mavlink_command_long_t 
     return result;
 }
 
+void GCS_MAVLINK::handle_command_auth_protoca_post(const mavlink_command_long_t &packet, MAV_RESULT result)
+{
+}
+
+
 void GCS_MAVLINK::handle_command_long(const mavlink_message_t &msg)
 {
     // decode packet
@@ -3685,6 +3701,8 @@ void GCS_MAVLINK::handle_command_long(const mavlink_message_t &msg)
 
     // send ACK or NAK
     mavlink_msg_command_ack_send(chan, packet.command, result);
+
+	handle_command_auth_protoca_post(packet, result);
 
     hal.util->persistent_data.last_mavlink_cmd = 0;
 }

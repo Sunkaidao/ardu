@@ -99,6 +99,8 @@ void MissionItemProtocol::handle_mission_request_list(
         return;
     }
 
+	//gcs().send_text(MAV_SEVERITY_WARNING, "3 %d", item_count());
+
     // reply with number of commands in the mission.  The GCS will
     // then request each command separately
     mavlink_msg_mission_count_send(_link.get_chan(),
