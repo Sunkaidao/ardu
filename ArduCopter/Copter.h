@@ -78,6 +78,7 @@
 #include <AP_TempCalibration/AP_TempCalibration.h>
 #include <AC_AutoTune/AC_AutoTune.h>
 #include <AP_Common/AP_FWVersion.h>
+#include <AP_Mission/AP_ABMission.h>     // AB Mission command library
 
 // Configuration
 #include "defines.h"
@@ -233,6 +234,9 @@ public:
     friend class ModeStabilize_Heli;
     friend class ModeThrow;
     friend class ModeZigZag;
+	friend class ModeZigZagAB;
+
+	friend class AP_ABMission; //baiyang added in 20190827
 
     Copter(void);
 
@@ -948,6 +952,10 @@ private:
 #if MODE_ZIGZAG_ENABLED == ENABLED
     ModeZigZag mode_zigzag;
 #endif
+#if MODE_ZIGZAG_AB_ENABLED == ENABLED
+	ModeZigZagAB mode_zigzag_ab;
+#endif
+
 
     // mode.cpp
     Mode *mode_from_mode_num(const uint8_t mode);

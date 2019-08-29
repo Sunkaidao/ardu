@@ -26,6 +26,11 @@ public:
     ///     caller should set the position controller's x,y and z speeds and accelerations before calling this
     void init();
 
+    /// init - initialise circle controller setting center using stopping point and projecting out based on the copter's heading
+    ///     caller should set the position controller's x,y and z speeds and accelerations before calling this
+    /// baiyang added in 20190829
+	void init_smooth(const Vector3f& center);
+
     /// set_circle_center in cm from home
     void set_center(const Vector3f& center) { _center = center; }
 
@@ -45,6 +50,13 @@ public:
 
     /// update - update circle controller
     void update();
+
+    /// update - update circle controller
+    /// This is another algorithm
+    /// This tracking circular trajectory algorithm comes from papers and pictures on the following websites.
+    /// https://github.com/BreederBai/algorithm-paper/tree/master/circle
+    /// baiyang added in 20190829
+	void update_smooth();
 
     /// get desired roll, pitch which should be fed into stabilize controllers
     float get_roll() const { return _pos_control.get_roll(); }
@@ -92,6 +104,7 @@ private:
     // parameters
     AP_Float    _radius;        // maximum horizontal speed in cm/s during missions
     AP_Float    _rate;          // rotation speed in deg/sec
+    AP_Float    _curvature_gain;  //Drawing circle algorithm gain K,baiyang added in 20190829
 
     // internal variables
     Vector3f    _center;        // center of circle in cm from home
@@ -101,4 +114,15 @@ private:
     float       _angular_vel;   // angular velocity in radians/sec
     float       _angular_vel_max;   // maximum velocity in radians/sec
     float       _angular_accel; // angular acceleration in radians/sec/sec
+
+    // baiyang added in 20190829
+	float       _speed_xy;
+	float       _initial_angle;
+	float       _last_angle;
+	float       _expected_speed_angle;
+	float       _gain_angle;
+	float       _gain_distance_xy;
+    int8_t      _cir_mode;
+	
+    Vector3f    _pos_delta;
 };

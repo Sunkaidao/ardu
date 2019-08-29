@@ -850,6 +850,31 @@ void AC_PosControl::init_xy_controller()
     init_ekf_xy_reset();
 }
 
+/// init_xy_controller - initialise the xy controller
+///     this should be called after setting the position target and the desired velocity and acceleration
+///     sets target roll angle, pitch angle and I terms based on vehicle current lean angles
+///     should be called once whenever significant changes to the position target are made
+///     this does not update the xy target
+void AC_PosControl::init_xy_controller_smooth()
+{
+    // set roll, pitch lean angle targets to current attitude
+    // todo: this should probably be based on the desired attitude not the current attitude
+    _roll_target = _ahrs.roll_sensor;
+    _pitch_target = _ahrs.pitch_sensor;
+
+    // initialise I terms from lean angles
+    _pid_vel_xy.reset_filter();
+    _accel_target.zero();
+    _pid_vel_xy.set_integrator(_accel_target - _accel_desired);
+
+    // flag reset required in rate to accel step
+    _flags.reset_desired_vel_to_pos = true;
+    _flags.reset_accel_to_lean_xy = true;
+
+    // initialise ekf xy reset handler
+    init_ekf_xy_reset();
+}
+
 /// update_xy_controller - run the horizontal position controller - should be called at 100hz or higher
 void AC_PosControl::update_xy_controller()
 {

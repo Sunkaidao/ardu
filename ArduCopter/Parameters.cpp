@@ -725,6 +725,13 @@ const AP_Param::Info Copter::var_info[] = {
 	// @User: Standard
 	GSCALAR(failsafe_gps_yaw, "FS_GYAW_ENABLE", FS_GPS_YAW_DISABLED),
 #endif
+
+#if MODE_ZIGZAG_AB_ENABLED == ENABLED
+    // @Group: MIS_
+    // @Path: ../libraries/AP_Mission/AP_Mission.cpp
+    GOBJECTN(mode_zigzag_ab.mission, ab_mission, "ABMIS_", AP_ABMission),
+#endif
+
     AP_VAREND
 };
 
@@ -933,6 +940,13 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @Description: Maximum value that the parameter currently being tuned with the transmitter's channel 6 knob will be set to
     // @User: Standard
     AP_GROUPINFO("TUNE_MAX", 32, ParametersG2, tuning_max, 0),
+
+    // @Param: WP_TURN_TYPE
+    // @DisplayName: breakpoint distance limit
+    // @Description: The maximum distance between the endpoint and the HOME point when performing a breakpoint flight. If this distance is exceeded, no breakpoint flight will be performed.
+    // @Values: 0: straight line, 1: U type
+    // @User: Standard
+    AP_GROUPINFO("WP_TURN_TYPE", 33, ParametersG2, wp_turn_type, 0),
 
     AP_GROUPEND
 };

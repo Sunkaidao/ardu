@@ -176,6 +176,22 @@ bool AC_WPNav::set_wp_destination(const Location& destination)
     return set_wp_destination(dest_neu, terr_alt);
 }
 
+/// set_wp_destination waypoint using location class
+///     returns false if conversion from location to vector from ekf origin cannot be calculated
+bool AC_WPNav::set_wp_destination_smooth(const Location& destination,float width)
+{
+    bool terr_alt;
+    Vector3f dest_neu;
+
+    // convert destination location to vector
+    if (!get_vector_NEU(destination, dest_neu, terr_alt)) {
+        return false;
+    }
+
+    // set target as vector from EKF origin
+    return set_wp_destination_smooth(dest_neu, terr_alt, width);
+}
+
 bool AC_WPNav::get_wp_destination(Location& destination) {
     Vector3f dest = get_wp_destination();
     if (!AP::ahrs().get_origin(destination)) {
@@ -212,6 +228,35 @@ bool AC_WPNav::set_wp_destination(const Vector3f& destination, bool terrain_alt)
 
     // set origin and destination
     return set_wp_origin_and_destination(origin, destination, terrain_alt);
+}
+
+/// set_wp_destination waypoint using position vector (distance from home in cm)
+///     terrain_alt should be true if destination.z is a desired altitude above terrain
+bool AC_WPNav::set_wp_destination_smooth(const Vector3f& destination, bool terrain_alt, float width)
+{
+	Vector3f origin;
+	_smoothing_speed = MIN(_pos_control.get_max_speed_xy(), safe_sqrt(0.5*_pos_control.get_max_accel_xy()*width));
+
+    // if waypoint controller is active use the existing position target as the origin
+    if ((AP_HAL::millis() - _wp_last_update) < 1000) {
+        origin = _pos_control.get_pos_target();
+    } else {
+        // if waypoint controller is not active, set origin to reasonable stopping point (using curr pos and velocity)
+        _pos_control.get_stopping_point_xy(origin);
+        _pos_control.get_stopping_point_z(origin);
+    }
+
+    // convert origin to alt-above-terrain
+    if (terrain_alt) {
+        float origin_terr_offset;
+        if (!get_terrain_offset(origin_terr_offset)) {
+            return false;
+        }
+        origin.z -= origin_terr_offset;
+    }
+
+    // set origin and destination
+    return set_wp_origin_and_destination_smooth(origin, destination, terrain_alt);
 }
 
 /// set waypoint destination using NED position vector from ekf origin in meters
@@ -278,6 +323,65 @@ bool AC_WPNav::set_wp_origin_and_destination(const Vector3f& origin, const Vecto
 	
     return true;
 }
+
+/// set_origin_and_destination - set origin and destination waypoints using position vectors (distance from home in cm)
+///     terrain_alt should be true if origin.z and destination.z are desired altitudes above terrain (false if these are alt-above-ekf-origin)
+///     returns false on failure (likely caused by missing terrain data)
+bool AC_WPNav::set_wp_origin_and_destination_smooth(const Vector3f& origin, const Vector3f& destination, bool terrain_alt)
+{
+    float throttle_alt_offset = _pos_control.get_throttle_alt_offset();
+	
+    // store origin and destination locations
+    _origin = origin;
+    _destination = destination;
+    _terrain_alt = terrain_alt;
+    Vector3f pos_delta = _destination - _origin + Vector3f(0,0,is_zero(throttle_alt_offset) ? 0 : _origin.z - _destination.z);
+
+    _track_length = pos_delta.length(); // get track length
+    _track_length_xy = safe_sqrt(sq(pos_delta.x)+sq(pos_delta.y));  // get horizontal track length (used to decide if we should update yaw)
+
+    // calculate each axis' percentage of the total distance to the destination
+    if (is_zero(_track_length)) {
+        // avoid possible divide by zero
+        _pos_delta_unit.x = 0;
+        _pos_delta_unit.y = 0;
+        _pos_delta_unit.z = 0;
+    }else{
+        _pos_delta_unit = pos_delta/_track_length;
+    }
+
+    // get origin's alt-above-terrain
+    float origin_terr_offset = 0.0f;
+    if (terrain_alt) {
+        if (!get_terrain_offset(origin_terr_offset)) {
+            return false;
+        }
+    }
+
+    // initialise intermediate point to the origin
+    _pos_control.set_pos_target(origin + Vector3f(0,0,origin_terr_offset));
+    _track_desired = 0;             // target is at beginning of track
+    _flags.reached_destination = false;
+    _flags.fast_waypoint = false;   // default waypoint back to slow
+    _flags.slowing_down = false;    // target is not slowing down yet
+    _flags.segment_type = SEGMENT_SMOOTH;
+    _flags.new_wp_destination = true;   // flag new waypoint so we can freeze the pos controller's feed forward and smooth the transition
+    _flags.wp_yaw_set = false;
+
+	// calculate leash lengths
+    calculate_wp_leash_length();
+
+    // initialise the limited speed to current speed along the track
+    const Vector3f &curr_vel = _inav.get_velocity();
+    // get speed along track (note: we convert vertical speed into horizontal speed equivalent)
+    float speed_along_track = curr_vel.x * _pos_delta_unit.x + curr_vel.y * _pos_delta_unit.y + curr_vel.z * _pos_delta_unit.z;
+    _limited_speed_xy_cms = constrain_float(speed_along_track, 0, _pos_control.get_max_speed_xy());
+
+    _throttle_alt_offset_last = throttle_alt_offset;
+	
+    return true;
+}
+
 
 /// shift_wp_origin_to_current_pos - shifts the origin and destination so the origin starts at the current position
 ///     used to reset the position just before takeoff
@@ -595,7 +699,11 @@ bool AC_WPNav::advance_wp_target_along_track_rf(float dt)
 
     // do not let desired point go past the end of the track unless it's a fast waypoint
     if (!_flags.fast_waypoint) {
-        _track_desired = constrain_float(_track_desired, 0, _track_length);
+        if (_flags.segment_type == SEGMENT_SMOOTH) {
+            _track_desired = constrain_float(_track_desired, 0, _track_length + 3*WPNAV_WP_FAST_OVERSHOOT_MAX);
+		}else {
+            _track_desired = constrain_float(_track_desired, 0, _track_length);
+		}
     } else {
         _track_desired = constrain_float(_track_desired, 0, _track_length + WPNAV_WP_FAST_OVERSHOOT_MAX);
     }
@@ -1237,6 +1345,10 @@ void AC_WPNav::calc_slow_down_distance(float speed_cms, float accel_cmss)
     // To-Do: should we use a combination of horizontal and vertical speeds?
     // To-Do: update this automatically when speed or acceleration is changed
     _slow_down_dist = speed_cms * speed_cms / (4.0f*accel_cmss);
+
+	if (_flags.segment_type == SEGMENT_SMOOTH) {
+        _slow_down_dist = (speed_cms * speed_cms - sq(_smoothing_speed))/ (2.0f*accel_cmss);
+	}
 }
 
 /// get_slow_down_speed - returns target speed of target point based on distance from the destination (in cm)
@@ -1244,12 +1356,20 @@ float AC_WPNav::get_slow_down_speed(float dist_from_dest_cm, float accel_cmss)
 {
     // return immediately if distance is zero (or less)
     if (dist_from_dest_cm <= 0) {
-        return WPNAV_WP_TRACK_SPEED_MIN;
+		if (_flags.segment_type == SEGMENT_SMOOTH) {
+            return fabsf(_smoothing_speed);
+		}else {
+			return WPNAV_WP_TRACK_SPEED_MIN;
+		}
     }
 
     // calculate desired speed near destination
     float target_speed = safe_sqrt(dist_from_dest_cm * 4.0f * accel_cmss);
 
+    if (_flags.segment_type == SEGMENT_SMOOTH) {
+		target_speed = safe_sqrt(dist_from_dest_cm * 2.0f * accel_cmss + sq(_smoothing_speed));
+	}
+	
     // ensure desired speed never becomes too low
     if (target_speed < WPNAV_WP_TRACK_SPEED_MIN) {
         return WPNAV_WP_TRACK_SPEED_MIN;

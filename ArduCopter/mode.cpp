@@ -50,6 +50,9 @@ Mode *Copter::mode_from_mode_num(const uint8_t mode)
 #if MODE_AUTO_ENABLED == ENABLED
         case AUTO:
             ret = &mode_auto;
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+			ret = &mode_zigzag_ab;
+#endif
             break;
 #endif
 
@@ -156,6 +159,12 @@ Mode *Copter::mode_from_mode_num(const uint8_t mode)
 #if MODE_ZIGZAG_ENABLED == ENABLED
         case ZIGZAG:
             ret = &mode_zigzag;
+            break;
+#endif
+
+#if MODE_ZIGZAG_ENABLED == ENABLED
+        case ZIGZAG_AB:
+            ret = &mode_zigzag_ab;
             break;
 #endif
 
@@ -290,6 +299,33 @@ void Copter::exit_mode(Mode *&old_flightmode,
         camera_mount.set_mode_to_default();
 #endif  // MOUNT == ENABLED
     }
+#endif
+
+    // stop mission when we leave auto mode
+#if MODE_ZIGZAG_AB_ENABLED == ENABLED
+    if (old_flightmode == &mode_zigzag_ab) {
+		mode_zigzag_ab.mission.record_break_point();
+        mode_zigzag_ab.mission.abmode_reset();
+    }
+
+	if (old_flightmode == &mode_zigzag_ab && \
+		(new_flightmode == &mode_stabilize || \
+		new_flightmode == &mode_althold || \
+		new_flightmode == &mode_loiter || \
+		new_flightmode == &mode_poshold) && \
+		motors->armed()) 
+	{
+		mode_zigzag_ab.mission.set_break_mode(2);
+        mode_zigzag_ab.mission.set_relay_spray();
+    }else if (old_flightmode == &mode_zigzag_ab && \
+		(new_flightmode == &mode_rtl || \
+		new_flightmode == &mode_auto || \
+		new_flightmode == &mode_guided) && \
+		motors->armed()) 
+	{
+        mode_zigzag_ab.mission.set_break_mode(1);
+        mode_zigzag_ab.mission.set_relay_spray();
+	}
 #endif
 
     // smooth throttle transition when switching from manual to automatic flight modes

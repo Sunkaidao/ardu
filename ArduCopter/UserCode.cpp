@@ -5,6 +5,11 @@ void Copter::userhook_init()
 {
     // put your initialisation code here
     // this will be called once at start-up
+#if MODE_ZIGZAG_AB_ENABLED == ENABLED
+	copter.mode_zigzag_ab.mission.init();
+    copter.mode_zigzag_ab.mission.set_turning_type_parameter(g2.wp_turn_type);
+#endif
+
 }
 #endif
 

@@ -1284,3 +1284,94 @@ private:
 
     uint32_t reach_wp_time_ms = 0;  // time since vehicle reached destination (or zero if not yet reached)
 };
+
+class ModeZigZagAB : public Mode {
+
+public:
+    // inherit constructor
+    using Mode::Mode;
+
+    bool init(bool ignore_checks) override;
+    void run() override;
+
+    bool requires_GPS() const override { return true; }
+    bool has_manual_throttle() const override { return false; }
+    bool allows_arming(bool from_gcs) const override { return false; };
+    bool is_autopilot() const override { return true; }
+    bool in_guided_mode() const override { return mode() == Auto_NavGuided; }
+
+    // Auto
+    AutoMode mode() const { return _mode; }
+
+    bool loiter_start();
+    void wp_start(const Vector3f& destination, bool terrain_alt);
+    void wp_start(const Location& dest_loc);
+    void circle_movetoedge_start(const Location &circle_center, float radius_m);
+    void circle_start();
+	void spline_start_smooth(const Location& dest_loc,float width);
+
+    AP_ABMission mission{
+        FUNCTOR_BIND_MEMBER(&ModeZigZagAB::start_command, bool, const AP_Mission::Mission_Command &),
+        FUNCTOR_BIND_MEMBER(&ModeZigZagAB::verify_command, bool, const AP_Mission::Mission_Command &),
+        FUNCTOR_BIND_MEMBER(&ModeZigZagAB::exit_mission, void)};
+
+protected:
+
+    const char *name() const override { return "ZIGZAG_AB"; }
+    const char *name4() const override { return "ZZAB"; }
+
+    uint32_t wp_distance() const override;
+    int32_t wp_bearing() const override;
+    float crosstrack_error() const override { return wp_nav->crosstrack_error();}
+    bool get_wp(Location &loc) override;
+    void run_autopilot() override;
+
+private:
+
+    bool start_command(const AP_Mission::Mission_Command& cmd);
+    bool verify_command(const AP_Mission::Mission_Command& cmd);
+    void exit_mission();
+
+    void wp_run();
+    void spline_run();
+    void circle_run();
+    void loiter_run();
+    void loiter_to_alt_run();
+
+    Location loc_from_cmd(const AP_Mission::Mission_Command& cmd) const;
+
+    AutoMode _mode = Auto_Loiter;   // controls which auto controller is run
+
+    Location terrain_adjusted_location(const AP_Mission::Mission_Command& cmd) const;
+
+    void do_nav_wp(const AP_Mission::Mission_Command& cmd);
+	void do_nav_wp_smooth(const AP_Mission::Mission_Command& cmd);
+    void do_loiter_unlimited(const AP_Mission::Mission_Command& cmd);
+    void do_circle(const AP_Mission::Mission_Command& cmd);
+    void do_loiter_time(const AP_Mission::Mission_Command& cmd);
+    void do_loiter_to_alt(const AP_Mission::Mission_Command& cmd);
+    void do_spline_wp(const AP_Mission::Mission_Command& cmd);
+    void do_yaw(const AP_Mission::Mission_Command& cmd);
+
+    bool verify_loiter_unlimited();
+    bool verify_loiter_time(const AP_Mission::Mission_Command& cmd);
+    bool verify_loiter_to_alt();
+    bool verify_yaw();
+    bool verify_nav_wp(const AP_Mission::Mission_Command& cmd);
+    bool verify_circle(const AP_Mission::Mission_Command& cmd);
+    bool verify_spline_wp(const AP_Mission::Mission_Command& cmd);
+
+    // Loiter control
+    uint16_t loiter_time_max;                // How long we should stay in Loiter Mode for mission scripting (time in seconds)
+    uint32_t loiter_time;                    // How long have we been loitering - The start time in millis
+
+    struct {
+        bool reached_destination_xy : 1;
+        bool loiter_start_done : 1;
+        bool reached_alt : 1;
+        float alt_error_cm;
+        int32_t alt;
+    } loiter_to_alt;
+
+};
+

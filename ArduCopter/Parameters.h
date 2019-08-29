@@ -373,6 +373,7 @@ public:
         // 254,255: reserved
 
 		k_param_failsafe_gps_yaw = 301,
+		k_param_ab_mission       = 302,
         // the k_param_* space is 9-bits in size
         // 511: reserved
     };
@@ -598,6 +599,10 @@ public:
 
     AP_Float tuning_min;
     AP_Float tuning_max;
+
+	/// 
+    AP_Int8 wp_turn_type;
+	///
 };
 
 extern const AP_Param::Info        var_info[];
