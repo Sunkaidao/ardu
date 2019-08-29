@@ -6,7 +6,9 @@
  */
 #pragma once
 
-#if HAL_OS_POSIX_IO || HAL_OS_FATFS_IO
+#include <AP_Filesystem/AP_Filesystem.h>
+
+#if HAVE_FILESYSTEM_SUPPORT
 
 #include <AP_HAL/utility/RingBuffer.h>
 #include "AP_Logger_Backend.h"
@@ -77,6 +79,7 @@ private:
     uint32_t _write_offset;
     volatile bool _open_error;
     const char *_log_directory;
+    bool _last_write_failed;
 
     uint32_t _io_timer_heartbeat;
     bool io_thread_alive() const;
@@ -179,4 +182,5 @@ private:
 
 };
 
-#endif // HAL_OS_POSIX_IO
+#endif // HAVE_FILESYSTEM_SUPPORT
+
