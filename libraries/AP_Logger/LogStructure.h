@@ -695,6 +695,7 @@ struct PACKED log_Cmd2 {
     int32_t longitude;
     float altitude;
     uint8_t frame;
+	float desired_velocity_z;
 };
 
 struct PACKED log_Radio {
@@ -1306,7 +1307,7 @@ struct PACKED log_Arm_Disarm {
     { LOG_CMD_MSG, sizeof(log_Cmd), \
       "CMD", "QHHHffffLLfB","TimeUS,CTot,CNum,CId,Prm1,Prm2,Prm3,Prm4,Lat,Lng,Alt,Frame", "s-------DUm-", "F-------GG0-" }, \
     { LOG_CMD2_MSG, sizeof(log_Cmd2), \
-      "CMD2", "QHHffffLLfB","TimeUS,CNum,CId,Prm1,Prm2,Prm3,Prm4,Lat,Lng,Alt,Frame", "s------DUm-", "F------GG0-" }, \
+      "CMD2", "QHHffffLLfBf","TimeUS,CNum,CId,Prm1,Prm2,Prm3,Prm4,Lat,Lng,Alt,Frame,Dz", "s------DUm-n", "F------GG0-B" }, \
     { LOG_RADIO_MSG, sizeof(log_Radio), \
       "RAD", "QBBBBBHH", "TimeUS,RSSI,RemRSSI,TxBuf,Noise,RemNoise,RxErrors,Fixed", "s-------", "F-------" }, \
     { LOG_CAMERA_MSG, sizeof(log_Camera), \

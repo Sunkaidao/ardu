@@ -421,7 +421,7 @@ bool AP_Logger_Backend::Write_Mission_Cmd(const AP_Mission &mission,
     return WriteBlock(&pkt, sizeof(pkt));
 }
 
-bool AP_Logger_Backend::Write_Mission_Cmd2(const AP_Mission::Mission_Command &cmd)
+bool AP_Logger_Backend::Write_Mission_Cmd2(const AP_Mission::Mission_Command &cmd, float vel_desired_z)
 {
     mavlink_mission_item_int_t mav_cmd = {};
     AP_Mission::mission_cmd_to_mavlink_int(cmd,mav_cmd);
@@ -437,7 +437,8 @@ bool AP_Logger_Backend::Write_Mission_Cmd2(const AP_Mission::Mission_Command &cm
         latitude        : mav_cmd.x,
         longitude       : mav_cmd.y,
         altitude        : mav_cmd.z,
-        frame           : mav_cmd.frame
+        frame           : mav_cmd.frame,
+        desired_velocity_z : vel_desired_z
     };
     return WriteBlock(&pkt, sizeof(pkt));
 }

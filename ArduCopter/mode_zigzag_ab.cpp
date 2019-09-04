@@ -222,7 +222,7 @@ bool ModeZigZagAB::start_command(const AP_Mission::Mission_Command& cmd)
 {
     // To-Do: logging when new commands start/end
     if (copter.should_log(MASK_LOG_CMD)) {
-        copter.logger.Write_Mission_Cmd2(cmd);
+        copter.logger.Write_Mission_Cmd2(cmd,pos_control->get_desired_velocity().z);
     }
 
     switch(cmd.id) {
