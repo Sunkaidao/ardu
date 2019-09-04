@@ -603,6 +603,13 @@ public:
 	/// 
     AP_Int8 wp_turn_type;
 	///
+
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+	///baiyang added in 20190904 
+    AP_Int8 ab_sitl;
+	///
+#endif 
+
 };
 
 extern const AP_Param::Info        var_info[];

@@ -948,6 +948,15 @@ const AP_Param::GroupInfo ParametersG2::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("WP_TURN_TYPE", 33, ParametersG2, wp_turn_type, 0),
 
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+    // @Param: WP_TURN_TYPE
+    // @DisplayName: breakpoint distance limit
+    // @Description: The maximum distance between the endpoint and the HOME point when performing a breakpoint flight. If this distance is exceeded, no breakpoint flight will be performed.
+    // @Values: 0: straight line, 1: U type
+    // @User: Standard
+    AP_GROUPINFO("AB_SITL", 34, ParametersG2, ab_sitl, 1),
+#endif
+
     AP_GROUPEND
 };
 

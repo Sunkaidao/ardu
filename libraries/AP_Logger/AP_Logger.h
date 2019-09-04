@@ -260,6 +260,7 @@ public:
     void Write_EntireMission();
     void Write_Mission_Cmd(const AP_Mission &mission,
                                const AP_Mission::Mission_Command &cmd);
+	void Write_Mission_Cmd2(const AP_Mission::Mission_Command &cmd);
     void Write_Origin(uint8_t origin_type, const Location &loc);
     void Write_RPM(const AP_RPM &rpm_sensor);
     void Write_Rate(const AP_AHRS_View *ahrs,

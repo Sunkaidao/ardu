@@ -168,13 +168,14 @@ bool AP_ABMission::abmode_set_pos_a(void)
 		&& ab_mode.is_start == NO)
 	{   
 		AP::ahrs_navekf().get_location(ab_mode.a_loc);
-		ab_mode.a_loc.alt = copter.inertial_nav.get_position().z;
+		ab_mode.a_loc.set_alt_cm(copter.inertial_nav.get_position().z,Location::AltFrame::ABOVE_HOME);
+		
 		if (!ab_mode.a_loc.get_vector_xy_from_origin_NE(ab_mode.a_pos)) {
             return false;
         }
 
 		ab_mode.is_record_a = YES;
-		
+
 		//A point -1
 		//copter.DataFlash.Log_Write_Target_WP(ab_mode.a_loc,-1,ab_mode.direction,ab_mode.yaw,home);
 		mark_wp_mavlink_index(-1);
@@ -236,13 +237,12 @@ bool AP_ABMission::abmode_set_pos_b(void)
 		&& copter.position_ok() \
 		&& ab_mode.is_start == NO)
 	{
-		AP::ahrs_navekf().get_location(ab_mode.b_loc);
-		ab_mode.b_loc.alt = copter.inertial_nav.get_position().z;
-
+		AP::ahrs_navekf().get_location(ab_mode.b_loc);            
+        ab_mode.b_loc.set_alt_cm(copter.inertial_nav.get_position().z,Location::AltFrame::ABOVE_HOME);
+		
         if (!ab_mode.b_loc.get_vector_xy_from_origin_NE(ab_mode.b_pos)) {
             return false;
         }
-
 		
 		ab_mode.is_record_b = YES;
 		
@@ -292,9 +292,11 @@ bool AP_ABMission::abmode_set_pos_a_sitl(void)
 		&& copter.position_ok() \
 		&& ab_mode.is_start == NO)
 	{   
-		ab_mode.a_loc.lat = -353627297;
-		ab_mode.a_loc.lng = 1491651450;
-		ab_mode.a_loc.alt = copter.inertial_nav.get_position().z;
+		ab_mode.a_loc.lat = -353638000;
+		ab_mode.a_loc.lng = 1491653194;
+         
+        ab_mode.a_loc.set_alt_cm(copter.inertial_nav.get_position().z,Location::AltFrame::ABOVE_HOME);
+
 		if (!ab_mode.a_loc.get_vector_xy_from_origin_NE(ab_mode.a_pos)) {
             return false;
         }
@@ -355,8 +357,9 @@ bool AP_ABMission::abmode_set_pos_b_sitl(void)
 	{
 		ab_mode.b_loc.lat = -353632615;
 		ab_mode.b_loc.lng = 1491652288;
-		ab_mode.b_loc.alt = copter.inertial_nav.get_position().z;
-
+            
+        ab_mode.b_loc.set_alt_cm(copter.inertial_nav.get_position().z,Location::AltFrame::ABOVE_HOME);
+		
         if (!ab_mode.b_loc.get_vector_xy_from_origin_NE(ab_mode.b_pos)) {
             return false;
         }
@@ -471,6 +474,12 @@ bool AP_ABMission::calc_two_wp(Vector2f &p1 , Vector2f &p2 , const float &d , co
 						circle_center.zero();
 						p1 = p1_next;
 			            p2 = p2_next;
+					}
+
+					if (is_route_short || change_route)
+					{
+					    turning_type = 0;
+						circle_center.zero();
 					}
 					
 					break;
@@ -686,6 +695,7 @@ bool AP_ABMission::start(void)
 		target_wp = ab_mode.b_loc;
 
 		clear_break_mode();
+		alt_break = 0;
 		
 		ab_mode.is_first_start = YES;
 		ab_mode.is_calc_wp = YES;
@@ -725,7 +735,7 @@ bool AP_ABMission::start(void)
 			if (home_loc.get_distance_NE(target_wp).length() > 500)
 			{
 			    overrange = true;
-			    //gcs().send_text(MAV_SEVERITY_ERROR,"ABMODE: Breakpoint overrange");
+			    gcs().send_text(MAV_SEVERITY_ERROR,"ABMODE: Breakpoint overrange");
 				//copter.Log_Write_Error(ERROR_SUBSYSTEM_BK_OVERRANGE, ERROR_CODE_FAILSAFE_OCCURRED);
 				return false;
 			}
@@ -870,12 +880,15 @@ void AP_ABMission:: restore_spray(const Location& home)
 	if (!temp1.get_vector_xy_from_origin_NE(p_1) || \
 	    !temp2.get_vector_xy_from_origin_NE(p_2))
 	{
+	    gcs().send_text(MAV_SEVERITY_CRITICAL,"ABMODE: restore spray failure");
 	    return;
 	}
 }
 
 void AP_ABMission:: set_wp_cmd(uint8_t type,const Location &target, AP_Mission::Mission_Command &cmd,float yaw_degree) 
 {
+    memset(&cmd, 0, sizeof(cmd));
+	
   	if (type == AB_MISSION_YAW) 
 	{
 	    cmd.id = MAV_CMD_CONDITION_YAW;
@@ -900,6 +913,7 @@ void AP_ABMission:: set_wp_cmd(uint8_t type,const Location &target, AP_Mission::
 	    cmd.id = MAV_CMD_NAV_WAYPOINT;
 	    cmd.content.location = target;
 		cmd.p1 = stop_time*1000;
+		cmd.index = index;
 
 		if (is_fast_waypoint)
 		{
@@ -919,6 +933,7 @@ void AP_ABMission:: set_wp_cmd(uint8_t type,const Location &target, AP_Mission::
 		set_wp_alt_and_type(cmd.content.location);
 		cmd.content.location.loiter_ccw = circle_ccw;
 		cmd.p1 = width/2;
+		cmd.index = index;
   	}
 }
 
@@ -929,9 +944,9 @@ void AP_ABMission:: set_wp_alt_and_type(Location &cmd_location)
 	cmd_location.terrain_alt = 0;
 	
 	temp_alt = MAX(ab_mode.a_loc.alt,ab_mode.b_loc.alt);
-	cmd_location.alt = MAX(alt_break,temp_alt);
-	cmd_location.relative_alt = 1;
-
+    flight_alt = MAX(alt_break,temp_alt);
+	cmd_location.alt = flight_alt;
+    cmd_location.relative_alt = 1;
 }
 
 void AP_ABMission:: adjust_yaw()
@@ -1422,8 +1437,7 @@ void AP_ABMission::update()
 	update_spray_dist();
 	update_rgb();
 	set_direction_from_rc_roll();
-	check_break_mode();
-    
+	
 	if (!ab_mode.is_start) 
 	{
     	return;
@@ -1451,6 +1465,33 @@ bool AP_ABMission::get_overrange()
 
 	return temp;
 }
+
+
+void AP_ABMission::start_loiter_to_alt()
+{
+    memset( & target_cmd, 0, sizeof(target_cmd));
+    target_cmd.id = MAV_CMD_NAV_LOITER_TO_ALT;
+	target_cmd.content.location.alt = flight_alt;
+    target_cmd.content.location.relative_alt = 1;
+
+	if (!_cmd_start_fn(target_cmd)) {
+        gcs().send_text(MAV_SEVERITY_CRITICAL,"ABMODE: start loiter to alt failure");
+    }
+}
+
+void AP_ABMission::stop_flight_forward()
+{
+    memset( & target_cmd, 0, sizeof(target_cmd));
+    target_cmd.id = MAV_CMD_NAV_WAYPOINT;
+    target_cmd.p1 = 1;
+	target_cmd.content.location.alt = flight_alt;
+    target_cmd.content.location.relative_alt = 1;
+	
+	if (!_cmd_start_fn(target_cmd)) {
+        gcs().send_text(MAV_SEVERITY_CRITICAL,"ABMODE: stop loiter to alt failure");
+    }
+}
+
 
 // singleton instance
 AP_ABMission *AP_ABMission::_singleton;

@@ -43,6 +43,11 @@ void Copter::userhook_SlowLoop()
     check_failsafe_gps_yaw();
 #endif
 
+#if MODE_ZIGZAG_AB_ENABLED == ENABLED
+    copter.mode_zigzag_ab.mission.set_turning_type_parameter(g2.wp_turn_type);
+    copter.mode_zigzag_ab.mission.check_break_mode();
+#endif
+
 }
 #endif
 

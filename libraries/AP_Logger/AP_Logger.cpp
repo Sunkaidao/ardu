@@ -708,6 +708,11 @@ void AP_Logger::Write_Mission_Cmd(const AP_Mission &mission,
     FOR_EACH_BACKEND(Write_Mission_Cmd(mission, cmd));
 }
 
+void AP_Logger::Write_Mission_Cmd2(const AP_Mission::Mission_Command &cmd)
+{
+    FOR_EACH_BACKEND(Write_Mission_Cmd2(cmd));
+}
+
 void AP_Logger::Write_RallyPoint(uint8_t total,
                                  uint8_t sequence,
                                  const RallyLocation &rally_point)

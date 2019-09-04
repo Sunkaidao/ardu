@@ -848,7 +848,9 @@ public:
     using Mode::Mode;
 
     bool init(bool ignore_checks) override;
+	bool init_without_roll(bool ignore_checks);
     void run() override;
+	void run_without_roll();
 
     bool requires_GPS() const override { return true; }
     bool has_manual_throttle() const override { return false; }
@@ -1360,6 +1362,8 @@ private:
     bool verify_nav_wp(const AP_Mission::Mission_Command& cmd);
     bool verify_circle(const AP_Mission::Mission_Command& cmd);
     bool verify_spline_wp(const AP_Mission::Mission_Command& cmd);
+
+	void abmode_switch_nav_mode();
 
     // Loiter control
     uint16_t loiter_time_max;                // How long we should stay in Loiter Mode for mission scripting (time in seconds)

@@ -122,11 +122,8 @@ void AC_Circle::init_smooth(const Vector3f& center)
 
     const Vector3f &curr_pos = _inav.get_position();
     _pos_control.set_xy_target(curr_pos.x, curr_pos.y);
+	_pos_control.set_desired_velocity_z(_inav.get_velocity_z());
     _pos_control.set_target_to_stopping_point_z();
-	
-    // set initial position target to reasonable stopping point
-    //_pos_control.set_target_to_stopping_point_xy();
-    //_pos_control.set_target_to_stopping_point_z();
 
     // calculate velocities
     calc_velocities(true);
@@ -254,10 +251,16 @@ void AC_Circle::update_smooth()
         if(is_negative(_rate.get())) //ni
         {
             _expected_speed_angle = wrap_PI(a1+_gain_angle-M_PI/2);
+			
+			_angle = a1;
+            _yaw = wrap_PI(_angle-0.5*M_PI) * DEGX100;
         }
 		else
 		{
             _expected_speed_angle = wrap_PI(a1-_gain_angle+M_PI/2);
+			
+			_angle = a1;
+            _yaw = wrap_PI(_angle+0.5*M_PI) * DEGX100;
 		}			
 
         Vector3f spd;
@@ -272,9 +275,7 @@ void AC_Circle::update_smooth()
             _angle_total += angle_diff;			
             _last_angle = a1;
         }
-			
-        _angle = a1;
-        _yaw = wrap_PI(_angle-M_PI) * DEGX100;
+
         _cir_mode = 0;
 		
         _pos_control.set_desired_velocity_xy(spd.x,spd.y);

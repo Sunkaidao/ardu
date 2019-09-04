@@ -188,6 +188,9 @@ public:
 	int8_t get_move_mode() const {return move_mode;}
 
 	bool get_circle_ccw() const {return circle_ccw;}
+
+	void start_loiter_to_alt();
+	void stop_flight_forward();
 	
 	static const struct AP_Param::GroupInfo     var_info[];
 protected:
@@ -270,6 +273,8 @@ private:
 	float curr_spd_pos_angle;
 
 	int8_t move_mode; // 0:straight line, 1:Arc
+
+	int32_t flight_alt;
 	//	added by zhangyong for
 };
 

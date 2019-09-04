@@ -682,6 +682,21 @@ struct PACKED log_Cmd {
     uint8_t frame;
 };
 
+struct PACKED log_Cmd2 {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+    uint16_t sequence;
+    uint16_t command;
+    float param1;
+    float param2;
+    float param3;
+    float param4;
+    int32_t latitude;
+    int32_t longitude;
+    float altitude;
+    uint8_t frame;
+};
+
 struct PACKED log_Radio {
     LOG_PACKET_HEADER;
     uint64_t time_us;
@@ -1290,6 +1305,8 @@ struct PACKED log_Arm_Disarm {
       "POWR","QffHB","TimeUS,Vcc,VServo,Flags,Safety", "svv--", "F00--" },  \
     { LOG_CMD_MSG, sizeof(log_Cmd), \
       "CMD", "QHHHffffLLfB","TimeUS,CTot,CNum,CId,Prm1,Prm2,Prm3,Prm4,Lat,Lng,Alt,Frame", "s-------DUm-", "F-------GG0-" }, \
+    { LOG_CMD2_MSG, sizeof(log_Cmd2), \
+      "CMD2", "QHHffffLLfB","TimeUS,CNum,CId,Prm1,Prm2,Prm3,Prm4,Lat,Lng,Alt,Frame", "s------DUm-", "F------GG0-" }, \
     { LOG_RADIO_MSG, sizeof(log_Radio), \
       "RAD", "QBBBBBHH", "TimeUS,RSSI,RemRSSI,TxBuf,Noise,RemNoise,RxErrors,Fixed", "s-------", "F-------" }, \
     { LOG_CAMERA_MSG, sizeof(log_Camera), \
@@ -1618,6 +1635,7 @@ enum LogMessages : uint8_t {
     LOG_AHR2_MSG,
     LOG_SIMSTATE_MSG,
     LOG_CMD_MSG,
+    LOG_CMD2_MSG,
     LOG_RADIO_MSG,
     LOG_ATRP_MSG,
     LOG_CAMERA_MSG,

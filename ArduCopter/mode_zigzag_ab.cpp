@@ -23,11 +23,13 @@
 bool ModeZigZagAB::init(bool ignore_checks)
 {
     if (copter.position_ok() || ignore_checks) {
-        _mode = Auto_Loiter;
+        _mode = Auto_WP;
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
-        mission.abmode_set_pos_a_sitl();
-        mission.abmode_set_pos_b_sitl();
+        if (copter.g2.ab_sitl == 1) {
+            mission.abmode_set_pos_a_sitl();
+            mission.abmode_set_pos_b_sitl();
+        }
 #endif
         // stop ROI from carrying over from previous runs of the mission
         // To-Do: reset the yaw as part of auto_wp_start when the previous command was not a wp command to remove the need for this special ROI check
@@ -37,6 +39,18 @@ bool ModeZigZagAB::init(bool ignore_checks)
 
         // initialise waypoint and spline controller
         wp_nav->wp_and_spline_init();
+
+        pos_control->set_desired_velocity_z(inertial_nav.get_velocity_z());
+		
+        // initialise wpnav to stopping point
+        Vector3f stopping_point;
+        wp_nav->get_wp_stopping_point(stopping_point);
+
+        // no need to check return status because terrain data is not used
+        wp_nav->set_wp_destination(stopping_point, false);
+
+        // initialise yaw
+        auto_yaw.set_mode_to_default(false);
 
         // clear guided limits
         copter.mode_guided.limit_clear();
@@ -61,6 +75,7 @@ void ModeZigZagAB::run()
     switch (_mode) {
 
     case Auto_WP:
+	case Auto_Spline:
     case Auto_CircleMoveToEdge:
         wp_run();
         break;
@@ -69,19 +84,23 @@ void ModeZigZagAB::run()
         circle_run();
         break;
 
-    case Auto_Spline:
-        wp_run();
-        break;
-
     case Auto_Loiter:
         loiter_run();
         break;
 
     case Auto_LoiterToAlt:
         loiter_to_alt_run();
+		mission.change_ab_wp(pos_control->get_pos_target());
         break;
     default:
         break;
+    }
+
+	if (_mode == Auto_WP || \
+		_mode == Auto_Spline || \
+		_mode == Auto_LoiterToAlt )
+    {
+        abmode_switch_nav_mode();
     }
 }
 
@@ -190,6 +209,12 @@ void ModeZigZagAB::circle_start()
 
     // initialise circle controller
     copter.circle_nav->init_smooth(copter.circle_nav->get_center());
+
+	// initialise yaw
+    // To-Do: reset the yaw only when the previous navigation command is not a WP.  this would allow removing the special check for ROI
+    if (auto_yaw.mode() != AUTO_YAW_ROI) {
+        auto_yaw.set_mode_to_default(false);
+    }
 }
 
 // start_command - this function will be called when the ap_mission lib wishes to start a new command
@@ -197,7 +222,7 @@ bool ModeZigZagAB::start_command(const AP_Mission::Mission_Command& cmd)
 {
     // To-Do: logging when new commands start/end
     if (copter.should_log(MASK_LOG_CMD)) {
-        //copter.logger.Write_Mission_Cmd(mission, cmd);
+        copter.logger.Write_Mission_Cmd2(cmd);
     }
 
     switch(cmd.id) {
@@ -368,7 +393,7 @@ void ModeZigZagAB::wp_run()
         if (!is_zero(target_yaw_rate)) {
             auto_yaw.set_mode(AUTO_YAW_HOLD);
         }
-
+		
 		// get pilot desired climb rate
         target_climb_rate = get_pilot_desired_climb_rate(channel_throttle->get_control_in());
         target_climb_rate = constrain_float(target_climb_rate, -get_pilot_speed_dn(), g.pilot_speed_up);
@@ -412,22 +437,47 @@ void ModeZigZagAB::wp_run()
 //      called by auto_run at 100hz or more
 void ModeZigZagAB::circle_run()
 {
+    // process pilot's yaw input
+    float target_yaw_rate = 0;
+	float target_climb_rate = 0.0f;
+	
+    if (!copter.failsafe.radio) {
+        // get pilot's desired yaw rate
+        target_yaw_rate = get_pilot_desired_yaw_rate(channel_yaw->get_control_in());
+        if (!is_zero(target_yaw_rate)) {
+            auto_yaw.set_mode(AUTO_YAW_HOLD);
+        }
+		
+		// get pilot desired climb rate
+        target_climb_rate = get_pilot_desired_climb_rate(channel_throttle->get_control_in());
+        target_climb_rate = constrain_float(target_climb_rate, -get_pilot_speed_dn(), g.pilot_speed_up);
+    }
+	
     // call circle controller
     copter.circle_nav->update_smooth();
 
+    // adjust climb rate using rangefinder
+    target_climb_rate = copter.get_surface_tracking_climb_rate(target_climb_rate);
+	
+    // get avoidance adjusted climb rate
+    target_climb_rate = get_avoidance_adjusted_climbrate(target_climb_rate);
+	
+    pos_control->set_alt_target_from_climb_rf_rate_ff(target_climb_rate, G_Dt, false);
+	
     // call z-axis position controller
     pos_control->update_z_controller();
 
-/*
+
     if (auto_yaw.mode() == AUTO_YAW_HOLD) {
-        // roll & pitch from waypoint controller, yaw rate from pilot
-        attitude_control->input_euler_angle_roll_pitch_yaw(copter.circle_nav->get_roll(), copter.circle_nav->get_pitch(), copter.circle_nav->get_yaw(), true);
-    } else {
         // roll, pitch from waypoint controller, yaw heading from auto_heading()
-        attitude_control->input_euler_angle_roll_pitch_yaw(copter.circle_nav->get_roll(), copter.circle_nav->get_pitch(), auto_yaw.yaw(), true);
+        //attitude_control->input_euler_angle_roll_pitch_yaw(copter.circle_nav->get_roll(), copter.circle_nav->get_pitch(), auto_yaw.yaw(), true);
+		attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(copter.circle_nav->get_roll(), copter.circle_nav->get_pitch(), 0);
+    } else {
+		// roll & pitch from waypoint controller, yaw rate from pilot
+        attitude_control->input_euler_angle_roll_pitch_yaw(copter.circle_nav->get_roll(), copter.circle_nav->get_pitch(), copter.circle_nav->get_yaw(), true);
     }
-*/
-    attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(copter.circle_nav->get_roll(), copter.circle_nav->get_pitch(), 0);
+
+    //attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(copter.circle_nav->get_roll(), copter.circle_nav->get_pitch(), 0);
 }
 
 // auto_loiter_run - loiter in AUTO flight mode
@@ -454,60 +504,23 @@ void ModeZigZagAB::loiter_run()
     copter.failsafe_terrain_set_status(wp_nav->update_wpnav());
 
     pos_control->update_z_controller();
-    attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(wp_nav->get_roll(), wp_nav->get_pitch(), target_yaw_rate);
+	
+    // call attitude controller
+    if (auto_yaw.mode() == AUTO_YAW_HOLD) {
+        // roll & pitch from waypoint controller, yaw rate from pilot
+        attitude_control->input_euler_angle_roll_pitch_euler_rate_yaw(wp_nav->get_roll(), wp_nav->get_pitch(), target_yaw_rate);
+    } else {
+        // roll, pitch from waypoint controller, yaw heading from auto_heading()
+        attitude_control->input_euler_angle_roll_pitch_yaw(wp_nav->get_roll(), wp_nav->get_pitch(), auto_yaw.yaw(), true);
+    }
 }
 
 // auto_loiter_run - loiter to altitude in AUTO flight mode
 //      called by auto_run at 100hz or more
 void ModeZigZagAB::loiter_to_alt_run()
 {
-    // if not auto armed or motor interlock not enabled set throttle to zero and exit immediately
-    if (is_disarmed_or_landed() || !motors->get_interlock()) {
-        zero_throttle_and_relax_ac();
-        return;
-    }
-
-    // possibly just run the waypoint controller:
-    if (!loiter_to_alt.reached_destination_xy) {
-        loiter_to_alt.reached_destination_xy = wp_nav->reached_wp_destination_xy();
-        if (!loiter_to_alt.reached_destination_xy) {
-            wp_run();
-            return;
-        }
-    }
-
-    if (!loiter_to_alt.loiter_start_done) {
-        loiter_nav->clear_pilot_desired_acceleration();
-        loiter_nav->init_target();
-        _mode = Auto_LoiterToAlt;
-        loiter_to_alt.loiter_start_done = true;
-    }
-    const float alt_error_cm = copter.current_loc.alt - loiter_to_alt.alt;
-    if (fabsf(alt_error_cm) < 5.0) { // random numbers R US
-        loiter_to_alt.reached_alt = true;
-    } else if (alt_error_cm * loiter_to_alt.alt_error_cm < 0) {
-        // we were above and are now below, or vice-versa
-        loiter_to_alt.reached_alt = true;
-    }
-    loiter_to_alt.alt_error_cm = alt_error_cm;
-
-    // loiter...
-
-    land_run_horizontal_control();
-
-    // Compute a vertical velocity demand such that the vehicle
-    // approaches the desired altitude.
-    float target_climb_rate = AC_AttitudeControl::sqrt_controller(
-        -alt_error_cm,
-        pos_control->get_pos_z_p().kP(),
-        pos_control->get_max_accel_z(),
-        G_Dt);
-
-    // get avoidance adjusted climb rate
-    target_climb_rate = get_avoidance_adjusted_climbrate(target_climb_rate);
-
-    pos_control->set_alt_target_from_climb_rate_ff(target_climb_rate, G_Dt, false);
-    pos_control->update_z_controller();
+	// call regular rtl flight mode run function
+    copter.mode_loiter.run_without_roll();
 }
 
 /********************************************************************************/
@@ -541,13 +554,47 @@ Location ModeZigZagAB::loc_from_cmd(const AP_Mission::Mission_Command& cmd) cons
 // do_nav_wp - initiate move to next waypoint
 void ModeZigZagAB::do_nav_wp(const AP_Mission::Mission_Command& cmd)
 {
-    Location target_loc = loc_from_cmd(cmd);
+    //Location target_loc = loc_from_cmd(cmd);
+	// convert back to location
+    Location target_loc(cmd.content.location);
 
     // this will be used to remember the time in millis after we reach or pass the WP.
     loiter_time = 0;
     // this is the delay, stored in seconds
     loiter_time_max = cmd.p1;
+	
+    // use current location if not provided
+    if (target_loc.lat == 0 && target_loc.lng == 0) {
+		// initialise waypoint and spline controller
+        wp_nav->wp_and_spline_init();
+		
+        // To-Do: make this simpler
+        Vector3f temp_pos;
+        copter.wp_nav->get_wp_stopping_point_xy(temp_pos);
+        const Location temp_loc(temp_pos);
+        target_loc.lat = temp_loc.lat;
+        target_loc.lng = temp_loc.lng;
+    }
 
+	if (_mode != Auto_WP && _mode != Auto_Spline) {
+		pos_control->set_desired_velocity_z(inertial_nav.get_velocity_z());
+        pos_control->set_target_to_stopping_point_z();
+	}
+
+    // use current altitude if not provided
+    // To-Do: use z-axis stopping point instead of current alt
+    if (target_loc.alt == 0) {
+        // set to current altitude but in command's alt frame
+        int32_t curr_alt;
+        if (copter.current_loc.get_alt_cm(target_loc.get_alt_frame(),curr_alt)) {
+            target_loc.set_alt_cm(curr_alt, target_loc.get_alt_frame());
+        } else {
+            // default to current altitude as alt-above-home
+            target_loc.set_alt_cm(copter.current_loc.alt,
+                                  copter.current_loc.get_alt_frame());
+        }
+    }
+	
     // Set wp navigation target
     wp_start(target_loc);
 
@@ -574,6 +621,11 @@ void ModeZigZagAB::do_nav_wp_smooth(const AP_Mission::Mission_Command& cmd)
     pos_control->set_desired_velocity_xy(0,0);
     pos_control->init_xy_controller_smooth();
 
+    if (_mode != Auto_WP && _mode != Auto_Spline) {
+		pos_control->set_desired_velocity_z(inertial_nav.get_velocity_z());
+        pos_control->set_target_to_stopping_point_z();
+	}
+	
     // Set wp navigation target
     spline_start_smooth(target_loc,cmd.p1);
 }
@@ -645,36 +697,8 @@ void ModeZigZagAB::do_loiter_time(const AP_Mission::Mission_Command& cmd)
 // note: caller should set yaw_mode
 void ModeZigZagAB::do_loiter_to_alt(const AP_Mission::Mission_Command& cmd)
 {
-    // re-use loiter unlimited
-    do_loiter_unlimited(cmd);
     _mode = Auto_LoiterToAlt;
-
-    // if we aren't navigating to a location then we have to adjust
-    // altitude for current location
-    Location target_loc(cmd.content.location);
-    if (target_loc.lat == 0 && target_loc.lng == 0) {
-        target_loc.lat = copter.current_loc.lat;
-        target_loc.lng = copter.current_loc.lng;
-    }
-
-    if (!target_loc.get_alt_cm(Location::AltFrame::ABOVE_HOME, loiter_to_alt.alt)) {
-        loiter_to_alt.reached_destination_xy = true;
-        loiter_to_alt.reached_alt = true;
-        gcs().send_text(MAV_SEVERITY_INFO, "bad do_loiter_to_alt");
-        return;
-    }
-    loiter_to_alt.reached_destination_xy = false;
-    loiter_to_alt.loiter_start_done = false;
-    loiter_to_alt.reached_alt = false;
-    loiter_to_alt.alt_error_cm = 0;
-
-    pos_control->set_max_accel_z(wp_nav->get_accel_z());
-    pos_control->set_max_speed_z(wp_nav->get_default_speed_down(),
-                                 wp_nav->get_default_speed_up());
-
-    if (pos_control->is_active_z()) {
-        pos_control->freeze_ff_z();
-    }
+	copter.mode_loiter.init_without_roll(false);
 }
 
 /********************************************************************************/
@@ -725,10 +749,12 @@ bool ModeZigZagAB::verify_loiter_time(const AP_Mission::Mission_Command& cmd)
 // (roughly) and altitude (precisely)
 bool ModeZigZagAB::verify_loiter_to_alt()
 {
+/*
     if (loiter_to_alt.reached_destination_xy &&
         loiter_to_alt.reached_alt) {
         return true;
     }
+*/
     return false;
 }
 
@@ -822,4 +848,200 @@ bool ModeZigZagAB::verify_spline_wp(const AP_Mission::Mission_Command& cmd)
     }
     return false;
 }
+
+void ModeZigZagAB::abmode_switch_nav_mode()
+{
+	static uint8_t step_pitch_a = 0;
+	static uint8_t step_pitch_b = 0;
+	static uint8_t state = 0;
+	bool should_jump = false;
+
+	//Check if radio control intervention is required
+	switch(state)
+	{
+		case 0:
+			if (mission.get_previous_wp() == mission.get_next_wp())
+	       {
+               state = 1;
+	       }
+			break;
+		case 1:
+			if (wp_nav->get_wp_distance_to_destination() < 300)
+			{
+			    should_jump = true;
+			    state = 2;
+			}
+			break;
+		case 2:
+			if (mission.get_previous_wp() == mission.get_next_wp())
+	       {
+				if (wp_nav->get_wp_distance_to_destination() > 300)
+				{
+				    should_jump = false;
+				    state = 0;
+				}
+				else
+				{
+				    should_jump = true;
+				}
+	       }
+			else
+			{
+			    Vector2f current_cm;
+			    Vector2f ab_pos_cm = mission.get_previous_wp() == 'A' ? mission.get_a_pos() : mission.get_b_pos();
+                current_cm.x = inertial_nav.get_position().x;
+                current_cm.y = inertial_nav.get_position().y;
+
+				if ((current_cm - ab_pos_cm).length() > 300)
+				{
+				    should_jump = false;
+				    state = 0;
+				}
+				else
+				{
+				    should_jump = true;
+				}
+			}
+			break;
+	}			
+
+	if (mission.get_previous_wp() == mission.get_next_wp() || should_jump)
+	{
+		return;
+	}
+
+
+	if (mission.get_next_wp() == 'A')
+    {
+		switch(step_pitch_a)
+		{
+			case 0:
+					//The pitch channel is pushed forward to a negative value and pushed back to a positive value.
+					if (copter.channel_pitch->get_control_in() > ROLL_PITCH_YAW_INPUT_MAX/20 && \
+						!wp_nav->reached_wp_destination())
+					{
+						step_pitch_a = 1;
+					}
+					else if (copter.channel_pitch->get_control_in() < -ROLL_PITCH_YAW_INPUT_MAX/20 && \
+						!wp_nav->reached_wp_destination())
+					{
+						step_pitch_a = 3;
+					}
+					else
+					{
+						step_pitch_a = 0;
+					}
+			       break;
+			case 1: 
+					if (channel_pitch->get_control_in() > ROLL_PITCH_YAW_INPUT_MAX/20 && \
+					 	  wp_nav->get_wp_distance_to_destination() < 300 )
+					{
+						 mission.start_loiter_to_alt();
+					     step_pitch_a = 2;
+						 
+						 mission.set_change_route(1);
+						 mission.set_is_fast_waypoint(false);
+					}
+			       break;
+			case 2:
+					if (channel_pitch->get_control_in() < ROLL_PITCH_YAW_INPUT_MAX/20)
+					{
+						mission.stop_flight_forward();
+						mission.change_ab_wp(pos_control->get_pos_target());
+				        step_pitch_a = 0;
+
+						mission.set_change_route(1);
+						mission.set_is_fast_waypoint(false);
+					}
+					break;
+			case 3:
+					if (channel_pitch->get_control_in() < -ROLL_PITCH_YAW_INPUT_MAX/20)
+					{
+                        mission.stop_flight_forward();
+						mission.change_ab_wp(pos_control->get_pos_target());
+				        step_pitch_a = 4;
+
+						mission.set_change_route(1);
+						mission.set_is_fast_waypoint(false);
+					}
+					break;
+			case 4:
+					if (channel_pitch->get_control_in() > -ROLL_PITCH_YAW_INPUT_MAX/20)
+					{
+				        step_pitch_a = 0;
+					}
+					break;
+			default:
+					step_pitch_a = 0;
+					break;
+		}
+    }
+    else if (mission.get_next_wp() == 'B')
+    {
+       switch(step_pitch_b)
+		{
+			case 0:
+				//The pitch channel is pushed forward to a negative value and pushed back to a positive value.
+				if (copter.channel_pitch->get_control_in() < -ROLL_PITCH_YAW_INPUT_MAX/20 && \
+						!wp_nav->reached_wp_destination())
+				{
+					step_pitch_b = 1;
+				}
+				else if (copter.channel_pitch->get_control_in() > ROLL_PITCH_YAW_INPUT_MAX/20 && \
+						!wp_nav->reached_wp_destination())
+				{
+					step_pitch_b = 3;
+				}
+				else
+				{
+
+					step_pitch_b = 0;
+				}
+			    break;
+			case 1: 
+				if (channel_pitch->get_control_in() < -ROLL_PITCH_YAW_INPUT_MAX/20 && \
+					 wp_nav->get_wp_distance_to_destination() < 300 )
+				{
+					mission.start_loiter_to_alt();
+					step_pitch_b = 2;
+
+					mission.set_change_route(1);
+					mission.set_is_fast_waypoint(false);
+				}
+			    break;
+			case 2:
+				if (channel_pitch->get_control_in() > -ROLL_PITCH_YAW_INPUT_MAX/20)
+				{
+                    mission.stop_flight_forward();
+                    mission.change_ab_wp(pos_control->get_pos_target());
+					step_pitch_b = 0;
+
+					mission.set_change_route(1);
+					mission.set_is_fast_waypoint(false);
+				}
+				break;
+			case 3:
+				if (channel_pitch->get_control_in() > -ROLL_PITCH_YAW_INPUT_MAX/20)
+				{
+					mission.stop_flight_forward();
+                    mission.change_ab_wp(pos_control->get_pos_target());
+				    step_pitch_b = 4;
+
+                    mission.set_change_route(1);
+                    mission.set_is_fast_waypoint(false);
+                }
+                break;
+			case 4:
+                if (channel_pitch->get_control_in() < ROLL_PITCH_YAW_INPUT_MAX/20)
+                {
+                    step_pitch_b = 0;
+				}
+                break;
+			default:
+				step_pitch_b = 0;
+				break;
+			}
+    }
+}
+
 #endif
