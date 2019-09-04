@@ -117,8 +117,6 @@ bool AP_ABMission::init()
 	change_route = 0;
 	change_route_last = 0;
 	move_mode = 0;
-    //width = (copter.sprayer.get_unspray_dist()-50)/100.0f;
-    width = 700;
 	
 	memset( & ab_mode.a_loc, 0, sizeof(ab_mode.a_loc));
 	memset( & ab_mode.b_loc, 0, sizeof(ab_mode.b_loc));
@@ -185,15 +183,6 @@ bool AP_ABMission::abmode_set_pos_a(void)
 
 		trigger_buzzer_and_rgb(AB_MISSION_BUZZER_AND_RGB);
 
-/*
-		//	added by zhangyong 20180824, begin to spraying 20180824
-		if(!copter.sprayer.get_running())
-		{
-			copter.sprayer.run(true);
-			copter.sprayer.test_pump(!copter.motors->armed());
-		}
-		//	added end
-*/
 		return true;
 	}
 
@@ -1263,20 +1252,11 @@ void AP_ABMission:: run()
         switch(step)
         {
             case 0:
-                // if (((copter.wp_nav->reached_wp_destination() &&  copter.guided_mode == Guided_WP ) 
-                //    || (reached_circle_angale() && copter.guided_mode == Guided_Circle)) && 
-                //    copter.wp_nav->get_wpnav_mode() >= 1) 
                 if (_cmd_verify_fn(target_cmd))
                 {
 
 					timer = AP_HAL::millis64();
 					step = 1;
-
-                    //if(!AP::sprayer().get_running())
-                    {
-                        AP::sprayer()-> run(true);
-                        AP::sprayer()-> test_pump(!copter.motors->armed());
-					}
     			}
 				break;
             case 1:
