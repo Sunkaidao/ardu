@@ -448,6 +448,28 @@ bool AP_Logger_Backend::Write_Mission_Cmd(const AP_Mission &mission,
     return WriteBlock(&pkt, sizeof(pkt));
 }
 
+bool AP_Logger_Backend::Write_Mission_Cmd2(const AP_Mission::Mission_Command &cmd, float vel_desired_z)
+{
+    mavlink_mission_item_int_t mav_cmd = {};
+    AP_Mission::mission_cmd_to_mavlink_int(cmd,mav_cmd);
+    struct log_Cmd2 pkt = {
+        LOG_PACKET_HEADER_INIT(LOG_CMD2_MSG),
+        time_us         : AP_HAL::micros64(),
+        sequence        : mav_cmd.seq,
+        command         : mav_cmd.command,
+        param1          : mav_cmd.param1,
+        param2          : mav_cmd.param2,
+        param3          : mav_cmd.param3,
+        param4          : mav_cmd.param4,
+        latitude        : mav_cmd.x,
+        longitude       : mav_cmd.y,
+        altitude        : mav_cmd.z,
+        frame           : mav_cmd.frame,
+        desired_velocity_z : vel_desired_z
+    };
+    return WriteBlock(&pkt, sizeof(pkt));
+}
+
 void AP_Logger_Backend::Write_EntireMission()
 {
     LoggerMessageWriter_WriteEntireMission writer{};

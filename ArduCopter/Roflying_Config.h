@@ -67,9 +67,15 @@
 //#define USERHOOK_50HZLOOP userhook_50Hz();                  // for code to be run at 50hz
 //#define USERHOOK_MEDIUMLOOP userhook_MediumLoop();        // for code to be run at 10hz
 #define USERHOOK_SLOWLOOP userhook_SlowLoop();            // for code to be run at 3.3hz
-//#define USERHOOK_SUPERSLOWLOOP userhook_SuperSlowLoop();  // for code to be run at 1hz
+#define USERHOOK_SUPERSLOWLOOP userhook_SuperSlowLoop();  // for code to be run at 1hz
 //#define USERHOOK_AUXSWITCH ENABLED                        // for code to handle user aux switches
 //#define USER_PARAMS_ENABLED ENABLED                       // to enable user parameters
+
+//////////////////////////////////////////////////////////////////////////////
+// AB mode - allows vehicle to trace waypoints and perform automated actions
+#ifndef MODE_ZIGZAG_AB_ENABLED
+# define MODE_ZIGZAG_AB_ENABLED ENABLED
+#endif
 
 
 //	added by zhangYong 20161109 for auth
@@ -78,7 +84,11 @@
 //
 
 #ifndef FXTX_AUTH
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+ #define FXTX_AUTH 	DISABLED
+#else
  #define FXTX_AUTH 	ENABLED
+#endif
 #endif
 
 #if FXTX_AUTH == ENABLED

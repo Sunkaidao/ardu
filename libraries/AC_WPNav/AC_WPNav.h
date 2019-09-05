@@ -100,6 +100,10 @@ public:
     /// set_wp_destination waypoint using location class
     ///     returns false if conversion from location to vector from ekf origin cannot be calculated
     bool set_wp_destination(const Location& destination);
+	
+    /// set_wp_destination waypoint using location class
+    ///     returns false if conversion from location to vector from ekf origin cannot be calculated
+	bool set_wp_destination_smooth(const Location& destination,float width);
 
     // returns wp location using location class.
     // returns false if unable to convert from target vector to global
@@ -114,6 +118,10 @@ public:
     ///     terrain_alt should be true if destination.z is a desired altitude above terrain
     bool set_wp_destination(const Vector3f& destination, bool terrain_alt = false);
 
+	/// set_wp_destination waypoint using position vector (distance from home in cm)
+    ///     terrain_alt should be true if destination.z is a desired altitude above terrain
+    bool set_wp_destination_smooth(const Vector3f& destination, bool terrain_alt, float width);
+
     /// set waypoint destination using NED position vector from ekf origin in meters
     bool set_wp_destination_NED(const Vector3f& destination_NED);
 
@@ -121,6 +129,11 @@ public:
     ///     terrain_alt should be true if origin.z and destination.z are desired altitudes above terrain (false if these are alt-above-ekf-origin)
     ///     returns false on failure (likely caused by missing terrain data)
     virtual bool set_wp_origin_and_destination(const Vector3f& origin, const Vector3f& destination, bool terrain_alt = false);
+
+	/// set_wp_origin_and_destination - set origin and destination waypoints using position vectors (distance from ekf origin in cm)
+    ///     terrain_alt should be true if origin.z and destination.z are desired altitudes above terrain (false if these are alt-above-ekf-origin)
+    ///     returns false on failure (likely caused by missing terrain data)
+    bool set_wp_origin_and_destination_smooth(const Vector3f& origin, const Vector3f& destination, bool terrain_alt = false);
 
     /// shift_wp_origin_to_current_pos - shifts the origin and destination so the origin starts at the current position
     ///     used to reset the position just before takeoff
@@ -234,7 +247,8 @@ protected:
     // segment types, either straight or spine
     enum SegmentType {
         SEGMENT_STRAIGHT = 0,
-        SEGMENT_SPLINE = 1
+        SEGMENT_SPLINE = 1,
+        SEGMENT_SMOOTH = 2
     };
 
     // flags structure
@@ -244,7 +258,7 @@ protected:
         uint8_t slowing_down            : 1;    // true when target point is slowing down before reaching the destination
         uint8_t recalc_wp_leash         : 1;    // true if we need to recalculate the leash lengths because of changes in speed or acceleration
         uint8_t new_wp_destination      : 1;    // true if we have just received a new destination.  allows us to freeze the position controller's xy feed forward
-        SegmentType segment_type        : 1;    // active segment is either straight or spline
+        SegmentType segment_type        : 2;    // active segment is either straight or spline
         uint8_t wp_yaw_set              : 1;    // true if yaw target has been set
     } _flags;
 
@@ -324,4 +338,5 @@ protected:
     float       _rangefinder_alt_cm;
 
 	float       _throttle_alt_offset_last;
+	float       _smoothing_speed;
 };

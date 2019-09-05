@@ -373,6 +373,7 @@ public:
         // 254,255: reserved
 
 		k_param_failsafe_gps_yaw = 301,
+		k_param_ab_mission       = 302,
         // the k_param_* space is 9-bits in size
         // 511: reserved
     };
@@ -603,6 +604,17 @@ public:
     // object avoidance path planning
     AP_OAPathPlanner oa;
 #endif
+
+	/// 
+    AP_Int8 wp_turn_type;
+	///
+
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+	///baiyang added in 20190904 
+    AP_Int8 ab_sitl;
+	///
+#endif 
+
 };
 
 extern const AP_Param::Info        var_info[];

@@ -860,12 +860,9 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_long_packet(const mavlink_command_
     }
 }
 
-
-
-
-
 void GCS_MAVLINK_Copter::handle_command_auth_protoca_post(const mavlink_command_long_t &packet, MAV_RESULT result)
 {
+#if FXTX_AUTH == ENABLED
 	if(MAV_CMD_AUTH_PROTOCAL == packet.command)
    	{
 
@@ -903,8 +900,8 @@ void GCS_MAVLINK_Copter::handle_command_auth_protoca_post(const mavlink_command_
 
 		}
    	}
-}
-
+#endif
+}
 
 void GCS_MAVLINK_Copter::handle_mount_message(const mavlink_message_t &msg)
 {
@@ -972,8 +969,9 @@ void GCS_MAVLINK_Copter::handleMessage(const mavlink_message_t &msg)
 	
 				// send ACK or NAK
 				mavlink_msg_command_ack_send(chan, packet.command, result);
-			
+#if FXTX_AUTH == ENABLED			
 				handle_command_auth_protoca_post(packet, result);
+#endif
 			}
 			default:
 			{

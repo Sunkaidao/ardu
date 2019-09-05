@@ -3683,7 +3683,6 @@ void GCS_MAVLINK::handle_command_auth_protoca_post(const mavlink_command_long_t 
 {
 }
 
-
 bool GCS_MAVLINK::command_long_stores_location(const MAV_CMD command)
 {
     switch(command) {

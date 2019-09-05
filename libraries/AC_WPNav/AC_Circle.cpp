@@ -23,6 +23,15 @@ const AP_Param::GroupInfo AC_Circle::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("RATE",    1, AC_Circle, _rate,    AC_CIRCLE_RATE_DEFAULT),
 
+	// @Param: RATE
+    // @DisplayName: Circle rate
+    // @Description: Circle mode's turn rate in deg/sec.  Positive to turn clockwise, negative for counter clockwise
+    // @Units: deg/s
+    // @Range: -90 90
+    // @Increment: 1
+    // @User: Standard
+    AP_GROUPINFO("CURV_G",    2, AC_Circle, _curvature_gain,    0.8f),
+
     AP_GROUPEND
 };
 
@@ -97,6 +106,42 @@ void AC_Circle::init()
     init_start_angle(true);
 }
 
+/// init - initialise circle controller setting center specifically
+///     caller should set the position controller's x,y and z speeds and accelerations before calling this
+void AC_Circle::init_smooth(const Vector3f& center)
+{
+    _center = center;
+
+    const Vector3f& vel_target = _pos_control.get_vel_target();
+	_speed_xy = safe_sqrt(sq(vel_target.x)+sq(vel_target.y));
+	
+    // initialise position controller (sets target roll angle, pitch angle and I terms based on vehicle current lean angles)
+    _pos_control.set_desired_accel_xy(0.0f,0.0f);
+    _pos_control.set_desired_velocity_xy(vel_target.x,vel_target.y);
+    _pos_control.init_xy_controller();
+
+    const Vector3f &curr_pos = _inav.get_position();
+    _pos_control.set_xy_target(curr_pos.x, curr_pos.y);
+	_pos_control.set_desired_velocity_z(_inav.get_velocity_z());
+    _pos_control.set_target_to_stopping_point_z();
+
+    // calculate velocities
+    calc_velocities(true);
+
+    // set start angle from position
+    init_start_angle(false);
+	
+    if (is_equal(curr_pos.x,_center.x) && is_equal(curr_pos.y,_center.y)) {
+        _initial_angle = wrap_PI(_ahrs.yaw-M_PI);
+    } else {
+        // get bearing from circle center to vehicle in radians
+        float bearing_rad = atan2f(curr_pos.y-_center.y,curr_pos.x-_center.x);
+        _initial_angle = wrap_PI(bearing_rad);
+    }
+
+	_last_angle = _initial_angle;
+}
+
 /// set_circle_rate - set circle rate in degrees per second
 void AC_Circle::set_rate(float deg_per_sec)
 {
@@ -160,6 +205,100 @@ void AC_Circle::update()
 
     // update position controller
     _pos_control.update_xy_controller();
+}
+
+/// update - update circle controller
+void AC_Circle::update_smooth()
+{
+    // calculate dt
+    float dt = _pos_control.time_since_last_xy_update();
+	// double check dt is reasonable
+    if (dt >= 0.2f) {
+        dt = 0.0f;
+    }
+	
+	const Vector3f &curr_pos = _inav.get_position();
+
+    // calculate target position
+    Vector3f target;
+    // if the circle_radius is zero we are doing panorama so no need to update loiter target
+    if (!is_zero(_radius)) {
+        // calculate target position
+
+        target.x = curr_pos.x;
+        target.y = curr_pos.y;	
+        target.z = _pos_control.get_alt_target();
+
+        // update position controller target
+        _pos_control.set_xy_target(target.x, target.y);
+
+        //This tracking circular trajectory algorithm comes from papers and pictures on the following websites.
+        //https://github.com/BreederBai/algorithm-paper/tree/master/circle
+        float a1;
+        if (is_equal(curr_pos.x,_center.x) && is_equal(curr_pos.y,_center.y)) {
+		    a1 = wrap_PI(_ahrs.yaw-M_PI);
+		} else {
+		    // get bearing from circle center to vehicle in radians
+		    float bearing_rad = atan2f(curr_pos.y-_center.y,curr_pos.x-_center.x);
+		    a1 = wrap_PI(bearing_rad);
+		}
+
+        _pos_delta = curr_pos - _center;		
+        _gain_distance_xy = (safe_sqrt(sq(_pos_delta.x)+sq(_pos_delta.y)) - _radius) / 100.0f;
+
+        _gain_angle = wrap_PI(atan(-_curvature_gain*_gain_distance_xy));
+
+        if(is_negative(_rate.get())) //ni
+        {
+            _expected_speed_angle = wrap_PI(a1+_gain_angle-M_PI/2);
+			
+			_angle = a1;
+            _yaw = wrap_PI(_angle-0.5*M_PI) * DEGX100;
+        }
+		else
+		{
+            _expected_speed_angle = wrap_PI(a1-_gain_angle+M_PI/2);
+			
+			_angle = a1;
+            _yaw = wrap_PI(_angle+0.5*M_PI) * DEGX100;
+		}			
+
+        Vector3f spd;
+
+        spd.x = _speed_xy * cosf(_expected_speed_angle);
+        spd.y = _speed_xy * sinf(_expected_speed_angle);
+			
+        float angle_diff = fabsf(wrap_PI(a1 - _last_angle));
+
+        if (angle_diff > M_PI/180.0)
+        {
+            _angle_total += angle_diff;			
+            _last_angle = a1;
+        }
+
+        _cir_mode = 0;
+		
+        _pos_control.set_desired_velocity_xy(spd.x,spd.y);
+        //_pos_control.set_reset_desired_vel_to_pos(true);
+        _pos_control.update_xy_controller();
+    }
+    else
+    {
+        // set target position to center
+        _pos_control.set_desired_velocity_xy(0,0);
+            
+        target.x = _center.x;
+        target.y = _center.y;
+        target.z = _pos_control.get_alt_target();
+
+        // update position controller target
+        _pos_control.set_xy_target(target.x, target.y);
+        
+        _yaw = _angle * DEGX100;
+        _cir_mode = 1;
+
+        _pos_control.update_xy_controller();
+    }
 }
 
 // get_closest_point_on_circle - returns closest point on the circle
