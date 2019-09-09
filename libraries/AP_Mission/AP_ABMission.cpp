@@ -166,13 +166,14 @@ bool AP_ABMission::abmode_set_pos_a(void)
 		&& ab_mode.is_start == NO)
 	{   
 		AP::ahrs_navekf().get_location(ab_mode.a_loc);
-		ab_mode.a_loc.set_alt_cm(copter.inertial_nav.get_position().z,Location::AltFrame::ABOVE_HOME);
+		ab_mode.a_loc.set_alt_cm(copter.pos_control->get_alt_target(),Location::AltFrame::ABOVE_ORIGIN);
 		
 		if (!ab_mode.a_loc.get_vector_xy_from_origin_NE(ab_mode.a_pos)) {
             return false;
         }
 
 		ab_mode.is_record_a = YES;
+        alt_break = 0;
 
 		//A point -1
 		//copter.DataFlash.Log_Write_Target_WP(ab_mode.a_loc,-1,ab_mode.direction,ab_mode.yaw,home);
@@ -227,14 +228,15 @@ bool AP_ABMission::abmode_set_pos_b(void)
 		&& ab_mode.is_start == NO)
 	{
 		AP::ahrs_navekf().get_location(ab_mode.b_loc);            
-        ab_mode.b_loc.set_alt_cm(copter.inertial_nav.get_position().z,Location::AltFrame::ABOVE_HOME);
+        ab_mode.b_loc.set_alt_cm(copter.pos_control->get_alt_target(),Location::AltFrame::ABOVE_ORIGIN);
 		
         if (!ab_mode.b_loc.get_vector_xy_from_origin_NE(ab_mode.b_pos)) {
             return false;
         }
 		
 		ab_mode.is_record_b = YES;
-		
+		alt_break = 0;
+
 		//B point -2
 		//copter.DataFlash.Log_Write_Target_WP(ab_mode.b_loc,-2,ab_mode.direction,ab_mode.yaw,home);
 		mark_wp_mavlink_index(-2);
@@ -284,13 +286,14 @@ bool AP_ABMission::abmode_set_pos_a_sitl(void)
 		ab_mode.a_loc.lat = -353638000;
 		ab_mode.a_loc.lng = 1491653194;
          
-        ab_mode.a_loc.set_alt_cm(copter.inertial_nav.get_position().z,Location::AltFrame::ABOVE_HOME);
-
+        ab_mode.a_loc.set_alt_cm(copter.pos_control->get_alt_target(),Location::AltFrame::ABOVE_ORIGIN);
+		
 		if (!ab_mode.a_loc.get_vector_xy_from_origin_NE(ab_mode.a_pos)) {
             return false;
         }
 
 		ab_mode.is_record_a = YES;
+		alt_break = 0;
 		
 		//A point -1
 		//copter.DataFlash.Log_Write_Target_WP(ab_mode.a_loc,-1,ab_mode.direction,ab_mode.yaw,home);
@@ -347,7 +350,7 @@ bool AP_ABMission::abmode_set_pos_b_sitl(void)
 		ab_mode.b_loc.lat = -353632615;
 		ab_mode.b_loc.lng = 1491652288;
             
-        ab_mode.b_loc.set_alt_cm(copter.inertial_nav.get_position().z,Location::AltFrame::ABOVE_HOME);
+        ab_mode.b_loc.set_alt_cm(copter.pos_control->get_alt_target(),Location::AltFrame::ABOVE_ORIGIN);
 		
         if (!ab_mode.b_loc.get_vector_xy_from_origin_NE(ab_mode.b_pos)) {
             return false;
@@ -355,6 +358,8 @@ bool AP_ABMission::abmode_set_pos_b_sitl(void)
 
 		
 		ab_mode.is_record_b = YES;
+
+		alt_break = 0;
 		
 		//B point -2
 		//copter.DataFlash.Log_Write_Target_WP(ab_mode.b_loc,-2,ab_mode.direction,ab_mode.yaw,home);
@@ -684,7 +689,6 @@ bool AP_ABMission::start(void)
 		target_wp = ab_mode.b_loc;
 
 		clear_break_mode();
-		alt_break = 0;
 		
 		ab_mode.is_first_start = YES;
 		ab_mode.is_calc_wp = YES;
@@ -929,13 +933,12 @@ void AP_ABMission:: set_wp_cmd(uint8_t type,const Location &target, AP_Mission::
 void AP_ABMission:: set_wp_alt_and_type(Location &cmd_location)
 {
 	int32_t temp_alt;
-	cmd_location.relative_alt = 0;
-	cmd_location.terrain_alt = 0;
 	
-	temp_alt = MAX(ab_mode.a_loc.alt,ab_mode.b_loc.alt);
+	//temp_alt = MAX(ab_mode.a_loc.alt,ab_mode.b_loc.alt);
+	temp_alt = ab_mode.b_loc.alt;
     flight_alt = MAX(alt_break,temp_alt);
-	cmd_location.alt = flight_alt;
-    cmd_location.relative_alt = 1;
+
+	cmd_location.set_alt_cm(flight_alt,Location::AltFrame::ABOVE_ORIGIN);
 }
 
 void AP_ABMission:: adjust_yaw()
@@ -1451,8 +1454,7 @@ void AP_ABMission::start_loiter_to_alt()
 {
     memset( & target_cmd, 0, sizeof(target_cmd));
     target_cmd.id = MAV_CMD_NAV_LOITER_TO_ALT;
-	target_cmd.content.location.alt = flight_alt;
-    target_cmd.content.location.relative_alt = 1;
+	target_cmd.content.location.set_alt_cm(flight_alt,Location::AltFrame::ABOVE_ORIGIN);
 
 	if (!_cmd_start_fn(target_cmd)) {
         gcs().send_text(MAV_SEVERITY_CRITICAL,"ABMODE: start loiter to alt failure");
@@ -1464,8 +1466,7 @@ void AP_ABMission::stop_flight_forward()
     memset( & target_cmd, 0, sizeof(target_cmd));
     target_cmd.id = MAV_CMD_NAV_WAYPOINT;
     target_cmd.p1 = 1;
-	target_cmd.content.location.alt = flight_alt;
-    target_cmd.content.location.relative_alt = 1;
+	target_cmd.content.location.set_alt_cm(flight_alt,Location::AltFrame::ABOVE_ORIGIN);
 	
 	if (!_cmd_start_fn(target_cmd)) {
         gcs().send_text(MAV_SEVERITY_CRITICAL,"ABMODE: stop loiter to alt failure");

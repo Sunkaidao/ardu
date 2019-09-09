@@ -191,6 +191,13 @@ public:
 
 	void start_loiter_to_alt();
 	void stop_flight_forward();
+
+	int32_t get_target_alt() {
+		//int32_t temp_alt = MAX(ab_mode.a_loc.alt,ab_mode.b_loc.alt);
+        flight_alt = MAX(alt_break,ab_mode.b_loc.alt);
+
+		return flight_alt;
+	}
 	
 	static const struct AP_Param::GroupInfo     var_info[];
 protected:

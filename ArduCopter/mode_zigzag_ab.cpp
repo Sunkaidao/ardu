@@ -23,7 +23,7 @@
 bool ModeZigZagAB::init(bool ignore_checks)
 {
     if (copter.position_ok() || ignore_checks) {
-        _mode = Auto_WP;
+        _mode = Auto_Loiter;
 
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
         if (copter.g2.ab_sitl == 1) {
@@ -39,13 +39,13 @@ bool ModeZigZagAB::init(bool ignore_checks)
 
         // initialise waypoint and spline controller
         wp_nav->wp_and_spline_init();
-
-        pos_control->set_desired_velocity_z(inertial_nav.get_velocity_z());
 		
         // initialise wpnav to stopping point
         Vector3f stopping_point;
         wp_nav->get_wp_stopping_point(stopping_point);
 
+        stopping_point.z = mission.get_target_alt();
+                       
         // no need to check return status because terrain data is not used
         wp_nav->set_wp_destination(stopping_point, false);
 
@@ -554,7 +554,6 @@ Location ModeZigZagAB::loc_from_cmd(const AP_Mission::Mission_Command& cmd) cons
 // do_nav_wp - initiate move to next waypoint
 void ModeZigZagAB::do_nav_wp(const AP_Mission::Mission_Command& cmd)
 {
-    //Location target_loc = loc_from_cmd(cmd);
 	// convert back to location
     Location target_loc(cmd.content.location);
 
@@ -575,11 +574,6 @@ void ModeZigZagAB::do_nav_wp(const AP_Mission::Mission_Command& cmd)
         target_loc.lat = temp_loc.lat;
         target_loc.lng = temp_loc.lng;
     }
-
-	if (_mode != Auto_WP && _mode != Auto_Spline) {
-		pos_control->set_desired_velocity_z(inertial_nav.get_velocity_z());
-        pos_control->set_target_to_stopping_point_z();
-	}
 
     // use current altitude if not provided
     // To-Do: use z-axis stopping point instead of current alt
