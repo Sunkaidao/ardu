@@ -31,6 +31,22 @@ const AP_Param::GroupInfo AP_Mission::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("OPTIONS",  2, AP_Mission, _options, AP_MISSION_OPTIONS_DEFAULT),
 
+	// @Param: B_INDEX
+    // @DisplayName: breakpoint index
+    // @Description: The position of the breakpoint in the generated new airline
+    // @Range: 0 32766
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("B_INDEX",  3, AP_Mission, _breakpoint.index, 0),
+
+    // @Param: B_OFFSET
+    // @DisplayName: breakpoint index offset
+    // @Description: The relative position of the breakpoint in the inserted waypoint
+    // @Range: 0 127
+    // @Increment: 1
+    // @User: Advanced
+    AP_GROUPINFO("B_OFFSET",  4, AP_Mission, _breakpoint.offset, 0),
+
     AP_GROUPEND
 };
 
@@ -58,6 +74,16 @@ void AP_Mission::init()
     	clear();	
     }
 
+    /// baiyang added in 20190910
+    update_spray_configuration();
+    find_first_waypoint();
+
+    if (_breakpoint.index != 0 && _breakpoint.index < _cmd_total)
+    {
+    	_nav_cmd.index = _breakpoint.index-1;
+    }
+    ///
+    
     _last_change_time_ms = AP_HAL::millis();
 }
 
@@ -182,6 +208,14 @@ void AP_Mission::reset()
     _prev_nav_cmd_wp_index = AP_MISSION_CMD_INDEX_NONE;
     _prev_nav_cmd_id       = AP_MISSION_CMD_ID_NONE;
     init_jump_tracking();
+
+	//baiyang added in 20180726
+    //_breakpoint.index is insert position, not actual position of the breakpoint.
+    if (_breakpoint.index != 0 && _breakpoint.index < _cmd_total)
+    {
+    	_nav_cmd.index = _breakpoint.index - 1;
+    }
+    //added end
 }
 
 /// clear - clears out mission
@@ -196,6 +230,11 @@ bool AP_Mission::clear()
     // remove all commands
     _cmd_total.set_and_save(0);
 
+    //remove breakpoint index
+    clear_b_index();
+    set_breakpoint_valid(false);
+    set_send_breakpoint(false);
+	
     // clear index to commands
     _nav_cmd.index = AP_MISSION_CMD_INDEX_NONE;
     _do_cmd.index = AP_MISSION_CMD_INDEX_NONE;
@@ -240,6 +279,29 @@ void AP_Mission::update()
         if (verify_command(_nav_cmd)) {
             // market _nav_cmd as complete (it will be started on the next iteration)
             _flags.nav_cmd_loaded = false;
+
+		    //baiyang added in 20180726
+            //After executing to the breakpoint, set the breakpoint to a fast waypoint and clear the breakpoint index
+            Mission_Command cmd;
+            uint16_t b_index;
+            if (_breakpoint.index != 0 && \
+				_breakpoint.index < _cmd_total)
+			 {
+			 	b_index = _breakpoint.index+_breakpoint.offset.get();
+				if (read_cmd_from_storage(b_index,cmd))
+				{
+					cmd.p1 = 0;
+					if (write_cmd_to_storage(b_index,cmd))
+					{
+						clear_b_index();
+						_nav_breakpoint_cmd = cmd;
+						_breakpoint.operation_type = 1;
+						set_send_breakpoint(true);
+					}
+				}
+		     }
+            //added end
+            
             // immediately advance to the next mission command
             if (!advance_current_nav_cmd()) {
                 // failure to advance nav command means mission has completed
@@ -396,6 +458,30 @@ bool AP_Mission::set_current_cmd(uint16_t index)
         return false;
     }
 
+    Mission_Command cmd_b;
+    uint16_t b_index;
+    //baiyang added in 20180726
+    //If you are not selecting a breakpoint, set the breakpoint to a fast waypoint
+    if (_breakpoint.index != 0)
+    {
+    	if (_breakpoint.index != index)
+    	{
+    		b_index = _breakpoint.index+_breakpoint.offset.get();
+    		if (read_cmd_from_storage(b_index,cmd_b))
+			{
+				cmd_b.p1 = 0;
+				if (write_cmd_to_storage(b_index,cmd_b))
+				{
+					clear_b_index();
+					_nav_breakpoint_cmd = cmd_b;
+					_breakpoint.operation_type = 1;
+					set_send_breakpoint(true);
+				}
+			}
+    	}
+    }
+    //added end
+    
     // stop the current running do command
     _do_cmd.index = AP_MISSION_CMD_INDEX_NONE;
     _flags.do_cmd_loaded = false;
@@ -1959,6 +2045,397 @@ bool AP_Mission::contains_item(MAV_CMD command) const
     }
     return false;
 }
+
+//baiyang added in 20180726
+bool AP_Mission::record_breakpoint()
+{
+    struct Location current_loc;
+	
+    if (!AP::ahrs().get_position(current_loc) || \
+		_nav_cmd.id == MAV_CMD_NAV_TAKEOFF || \
+		_nav_cmd.id == MAV_CMD_NAV_RETURN_TO_LAUNCH || \
+		_nav_cmd.index == _first_nav_cmd_index)
+    {
+        goto record_breakpoint_false;
+    }
+	
+	if (_breakpoint.index != 0 && (_nav_cmd.index == (_breakpoint.index + _breakpoint.offset)))
+	{	
+	    return false;
+	}
+	else
+	{
+	    _breakpoint.index.set_and_save_ifchanged(_nav_cmd.index==AP_MISSION_CMD_INDEX_NONE?0:_nav_cmd.index);
+	    _breakpoint.lat = current_loc.lat;
+	    _breakpoint.lng = current_loc.lng;
+	    _breakpoint.breakpoint_valid = true;
+	}
+
+	//printf("b_index: %d,cmd_index: %d\n",_breakpoint.index,_nav_cmd.index);
+
+	return true;
+
+record_breakpoint_false:
+	_breakpoint.lat = 0;
+	_breakpoint.lng = 0;
+	_breakpoint.index.set_and_save_ifchanged(0);
+	_breakpoint.breakpoint_valid = false;
+	return false;
+}
+
+//baiyang added in 20180726
+int8_t AP_Mission::regenerate_airline()
+{
+    Mission_Command cmd;
+    Mission_Command cmd_b;
+    Mission_Command cmd_pre;
+    Mission_Command cmd_cam_tigg_dist;
+    memset( & cmd_cam_tigg_dist, 0, sizeof(cmd_cam_tigg_dist));
+    int8_t num_insert = 1;
+    insert_mask = 1;
+
+    if (_cmd_total == 0 || _flags.state == MISSION_RUNNING)
+    {
+    	return 0;
+    }
+	
+    if (!_breakpoint.breakpoint_valid || _breakpoint.index == 0)
+    {
+    	return -1;
+    }
+
+    if (_breakpoint.index >= _cmd_total)
+    {
+    	return -2;
+    }
+	
+    if (_cmd_speed.id == MAV_CMD_DO_CHANGE_SPEED)
+    {
+    	num_insert ++;
+		insert_mask = insert_mask | (int8_t)(1U<<1);
+    }
+
+    if (_cmd_yaw.id == MAV_CMD_CONDITION_YAW)
+    {
+    	num_insert ++;
+		insert_mask = insert_mask | (int8_t)(1U<<2);
+    }
+
+    if (_cmd_do_spray.id == MAV_CMD_DO_SPRAYER)
+    {
+    	num_insert ++;
+		insert_mask = insert_mask | (int8_t)(1U<<3);
+    }
+
+    for (uint16_t i = (uint16_t)_breakpoint.index.get(); i > 0 ;i --)
+    {
+        if (!read_cmd_from_storage(i - 1,cmd_cam_tigg_dist))
+        {
+            break;
+        }
+
+        if (cmd_cam_tigg_dist.id == MAV_CMD_DO_SET_CAM_TRIGG_DIST)
+        {
+            num_insert ++;
+            insert_mask = insert_mask | (int8_t)(1U<<4);
+            break;
+        }
+
+        if (cmd_cam_tigg_dist.id == MAV_CMD_NAV_WAYPOINT)
+        {
+            break;
+        }
+    }
+
+    int16_t _cmd_total_temp = (_cmd_total + num_insert);
+
+    if (_cmd_total_temp >= num_commands_max())
+    {
+    	return -4;
+    }
+	
+    for ( int16_t i = _cmd_total-1; i >= _breakpoint.index; i --)
+    {
+    	if(read_cmd_from_storage(i,cmd))
+		{
+			cmd.index = i+num_insert;
+			write_cmd_to_storage(i+num_insert,cmd);
+			//printf("index %d,id %d\n",cmd.index,cmd.id);
+		}
+		else
+		{
+			clear();
+			return -5;
+		}
+
+		if (cmd.id == MAV_CMD_NAV_WAYPOINT)
+		{
+			cmd_b = cmd;
+		}
+    }
+
+    for ( int16_t i = _breakpoint.index - 1; i > 0; i --)
+    {
+    	if(read_cmd_from_storage(i,cmd))
+		{
+			cmd.index = i+num_insert;
+		}
+		else
+		{
+			clear();
+			return -5;
+		}
+
+		if (cmd.id == MAV_CMD_NAV_WAYPOINT)
+		{
+			cmd_pre = cmd;
+			break;
+		}
+    }
+
+    int8_t offset = 0;
+    if (_cmd_speed.id == MAV_CMD_DO_CHANGE_SPEED)
+    {
+    	_cmd_speed.index = _breakpoint.index + offset;
+    	if (write_cmd_to_storage(_breakpoint.index + offset,_cmd_speed))
+    	{
+			offset ++;
+    	}
+		else
+		{
+			clear();
+		}
+    }
+
+    if (_cmd_yaw.id == MAV_CMD_CONDITION_YAW)
+    {
+    	_cmd_yaw.index = _breakpoint.index + offset;
+    	if (write_cmd_to_storage(_breakpoint.index + offset,_cmd_yaw) )
+    	{
+			offset ++;
+    	}
+		else
+		{
+			clear();
+		}
+    }
+
+    Location breakpoint_online = get_breakpoint_online(cmd_pre.content.location,cmd_b.content.location);
+    cmd_b.index = _breakpoint.index + offset;
+	
+    if (breakpoint_online.lat == 0 && breakpoint_online.lng == 0)
+    {
+        cmd_b.content.location.lat = _breakpoint.lat;
+        cmd_b.content.location.lng = _breakpoint.lng;
+    }
+    else
+    {
+        cmd_b.content.location.lat = breakpoint_online.lat;
+        cmd_b.content.location.lng = breakpoint_online.lng;
+    }
+    
+    _nav_breakpoint_cmd = cmd_b;
+    _breakpoint.offset.set_and_save_ifchanged(offset);
+
+    if (write_cmd_to_storage(_breakpoint.index + offset,cmd_b))
+    {
+		offset ++;
+    }
+    else
+    {
+		clear();
+		return -6;
+    }
+	
+    if (_cmd_do_spray.id == MAV_CMD_DO_SPRAYER)
+    {
+    	_cmd_do_spray.index = _breakpoint.index + offset;
+    	if (write_cmd_to_storage(_breakpoint.index + offset,_cmd_do_spray) )
+    	{
+			offset ++;
+    	}
+		else
+		{
+			clear();
+		}
+    }
+
+    if (cmd_cam_tigg_dist.id == MAV_CMD_DO_SET_CAM_TRIGG_DIST)
+    {
+        cmd_cam_tigg_dist.index = _breakpoint.index + offset;
+        if (write_cmd_to_storage(_breakpoint.index + offset,cmd_cam_tigg_dist) )
+        {
+            offset ++;
+        }
+        else
+        {
+            clear();
+        }
+    }
+
+	_breakpoint.breakpoint_valid = false;
+    _cmd_total.set_and_save_ifchanged(_cmd_total_temp);
+    _breakpoint.operation_type = 0;
+    set_send_breakpoint(true);
+	
+    return true;
+}
+
+Location AP_Mission :: get_breakpoint_online(const Location &position_pre,const Location &position_behind)
+{
+    Location origin_loc;
+    Location breakpoint;
+    breakpoint.lat = _breakpoint.lat;
+    breakpoint.lng = _breakpoint.lng;
+    
+    if (!AP::ahrs().get_origin(origin_loc))
+    {
+        return breakpoint;
+    }
+
+	Vector2f position_ned_pre_m = origin_loc.get_distance_NE(position_pre);
+    Vector2f position_ned_behind_m = origin_loc.get_distance_NE(position_behind);
+    Vector2f position_ned_break_m = origin_loc.get_distance_NE(breakpoint);
+
+    Vector2f break_point_online =  Vector2f::closest_point(position_ned_break_m, position_ned_pre_m, position_ned_behind_m);
+    Vector3f break_point_online_cm(break_point_online.x*100,break_point_online.y*100,0);
+
+    Location breakpoint_online(break_point_online_cm);
+	
+    return breakpoint_online;
+}
+
+void AP_Mission :: update_spray_configuration()
+{
+	 //baiyang added in 20180726
+    //These three commands should be in the first 6 waypoints.
+    Mission_Command cmd;
+    if (_cmd_total >= 6)
+    {
+    	for(int i = 0; i < 10; i++)
+    	{
+    		read_cmd_from_storage(i,cmd);
+			if (cmd.id == MAV_CMD_DO_CHANGE_SPEED)
+			{
+				_cmd_speed = cmd;
+			}
+		
+			if (cmd.id == MAV_CMD_CONDITION_YAW)
+			{
+				_cmd_yaw = cmd;
+			}
+			
+			if (cmd.id == MAV_CMD_DO_SPRAYER)
+			{
+				_cmd_do_spray = cmd;
+			}
+    	}
+    }
+}
+
+void AP_Mission :: find_first_waypoint()
+{
+    Mission_Command cmd;
+	
+    if (_cmd_total > 1)
+    {
+    	_first_nav_cmd_index = 0;
+    	for(int i = 1; i < _cmd_total; i++)
+    	{
+    		read_cmd_from_storage(i,cmd);
+			if (cmd.id == MAV_CMD_NAV_WAYPOINT)
+			{
+				_first_nav_cmd_index = cmd.index;
+				break;
+			}
+    	}
+    }
+}
+
+int8_t AP_Mission :: is_breakpoint_overrange(int16_t range_m)
+{
+    int8_t res = 1;	
+	Mission_Command cmd;
+	
+    if (_breakpoint.index != 0 && _breakpoint.index < _cmd_total)
+    {
+        for ( int16_t i = _breakpoint.index; i < _cmd_total; i ++)
+	    {
+	    	if(!read_cmd_from_storage(i,cmd))
+			{
+			    res = -1;
+				break;
+			}
+
+			if (cmd.id == MAV_CMD_NAV_WAYPOINT)
+			{
+				break;
+			}
+	    }
+
+		Vector2f vec_ne_cm;
+		if (cmd.content.location.get_vector_xy_from_origin_NE(vec_ne_cm))
+		{
+		    vec_ne_cm /= 100.0f;
+
+		    if (res != -1 && vec_ne_cm.length() > (float)range_m)
+    	    {
+    	        res = -2;
+			    overrange = true;
+    	    }
+		}
+    }
+
+	return res;
+}
+
+bool AP_Mission :: get_overrange()
+{
+    bool temp = overrange;
+
+	if (overrange)
+	{
+	    overrange = false;
+	}
+
+	return temp;
+}
+
+/*
+  send breakpoint msg
+  baiyang added in 20180817
+ */
+void AP_Mission :: send_mission_breakpoint(mavlink_channel_t chan,int16_t sysid_this_mav)
+{
+    mavlink_command_int_t packet_cmd;
+    mavlink_mission_item_int_t packet_mis;
+
+    int16_t breakpoint_index = get_nav_breakpoint_cmd().index - get_breakpoint_offset();
+	
+    if(get_send_breakpoint())
+    {
+    	if (AP_Mission::mission_cmd_to_mavlink_int(get_nav_breakpoint_cmd(),packet_mis))
+    	{
+
+			packet_cmd.param1 = packet_mis.param1;
+			packet_cmd.param2 = get_insert_mask();
+			packet_cmd.param3 = breakpoint_index;
+			packet_cmd.param4 = get_breakpoint_type();
+			packet_cmd.x = packet_mis.x;
+			packet_cmd.y = packet_mis.y;
+			packet_cmd.z = packet_mis.z;
+			packet_cmd.command = MAV_CMD_NAV_BREAK_WAYPOINT;
+			packet_cmd.target_system = sysid_this_mav;
+			packet_cmd.target_component = 1;
+			packet_cmd.frame = packet_mis.frame;
+			packet_cmd.current = 0;
+			packet_cmd.autocontinue = 0;
+				
+	    	mavlink_msg_command_int_send_struct(chan,&packet_cmd);
+    	}
+    }
+}
+//added end
 
 // singleton instance
 AP_Mission *AP_Mission::_singleton;

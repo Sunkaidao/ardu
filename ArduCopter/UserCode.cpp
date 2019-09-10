@@ -100,8 +100,8 @@ void Copter::userhook_init()
 */
 #endif		//	FXTX_AUTH == 1    
 #if MODE_ZIGZAG_AB_ENABLED == ENABLED
-	copter.mode_zigzag_ab.mission.init();
-    copter.mode_zigzag_ab.mission.set_turning_type_parameter(g2.wp_turn_type);
+	mode_zigzag_ab.mission.init();
+    mode_zigzag_ab.mission.set_turning_type_parameter(g2.wp_turn_type);
 #endif
 
 }
@@ -138,8 +138,8 @@ void Copter::userhook_SlowLoop()
 #endif
 
 #if MODE_ZIGZAG_AB_ENABLED == ENABLED
-    copter.mode_zigzag_ab.mission.set_turning_type_parameter(g2.wp_turn_type);
-    copter.mode_zigzag_ab.mission.check_break_mode();
+    mode_zigzag_ab.mission.set_turning_type_parameter(g2.wp_turn_type);
+    mode_zigzag_ab.mission.check_break_mode();
 #endif
 
 }
@@ -149,6 +149,11 @@ void Copter::userhook_SlowLoop()
 void Copter::userhook_SuperSlowLoop()
 {
     // put your 1Hz code here
+    if (!motors->armed())
+	{	
+		//printf("reason err: %d\n",mission.regenerate_airline());
+		mode_auto.mission.regenerate_airline();
+	}
 }
 #endif
 

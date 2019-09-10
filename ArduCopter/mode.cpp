@@ -298,7 +298,16 @@ void Copter::exit_mode(Mode *&old_flightmode,
     // stop mission when we leave auto mode
 #if MODE_AUTO_ENABLED == ENABLED
     if (old_flightmode == &mode_auto) {
+		if (mode_auto.mission.state() == AP_Mission::MISSION_COMPLETE) {
+			mode_auto.mission.set_breakpoint_valid(false);
+		 }
+		
         if (mode_auto.mission.state() == AP_Mission::MISSION_RUNNING) {
+			if (motors->armed()) {
+	            if (!mode_auto.mission.record_breakpoint()) {
+					mode_auto.mission.set_breakpoint_valid(false);
+	            }
+            }
             mode_auto.mission.stop();
         }
 #if MOUNT == ENABLED

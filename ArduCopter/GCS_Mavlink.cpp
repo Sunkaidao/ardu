@@ -289,7 +289,13 @@ bool GCS_MAVLINK_Copter::try_send_message(enum ap_message id)
 #endif
         break;
     }
-
+	
+    case MSG_COMMAND_INT:
+#if CONFIG_HAL_BOARD != HAL_BOARD_SITL
+		CHECK_PAYLOAD_SIZE(COMMAND_INT);
+		copter.mode_auto.mission.send_mission_breakpoint(chan,copter.g.sysid_this_mav);
+#endif
+		break;
     default:
         return GCS_MAVLINK::try_send_message(id);
     }
@@ -411,6 +417,7 @@ static const ap_message STREAM_EXTENDED_STATUS_msgs[] = {
     MSG_NAV_CONTROLLER_OUTPUT,
     MSG_FENCE_STATUS,
     MSG_POSITION_TARGET_GLOBAL_INT,
+    MSG_COMMAND_INT
 };
 static const ap_message STREAM_POSITION_msgs[] = {
     MSG_LOCATION,

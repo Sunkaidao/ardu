@@ -137,4 +137,11 @@ void MissionItemProtocol_Waypoints::truncate(const mavlink_mission_count_t &pack
 {
     // new mission arriving, truncate mission to be the same length
     mission.truncate(packet.count);
+
+	//	added by ZhangYong 20170706 for mission planner debug 20190423
+	//	printf("%d VS %d\n", packet.count, mission.num_commands_max());
+	//	added end
+	mission.set_breakpoint_valid(false);
+	mission.clear_b_index();
+	mission.set_send_breakpoint(false);
 }

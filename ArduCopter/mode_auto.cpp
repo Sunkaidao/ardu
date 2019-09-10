@@ -43,6 +43,8 @@ bool ModeAuto::init(bool ignore_checks)
         // clear guided limits
         copter.mode_guided.limit_clear();
 
+        mission.set_breakpoint_valid(false);
+		
         // start/resume the mission (based on MIS_RESTART parameter)
         mission.start_or_resume();
         return true;
