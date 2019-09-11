@@ -87,9 +87,7 @@ void Copter::userhook_init()
     	     (unsigned)serial_id[15], 	(unsigned)serial_id[16], 	(unsigned)serial_id[17], 	(unsigned)serial_id[18], 	(unsigned)serial_id[19], (unsigned)serial_id[20], 	(unsigned)serial_id[21], (unsigned)serial_id[22], \
     	     (unsigned)serial_id[24], 	(unsigned)serial_id[25], 	(unsigned)serial_id[26], 	(unsigned)serial_id[27], 	(unsigned)serial_id[28], (unsigned)serial_id[29], 	(unsigned)serial_id[30], (unsigned)serial_id[31]);
 
-#if CONFIG_HAL_BOARD != HAL_BOARD_SITL
-	gcs().send_text(MAV_SEVERITY_INFO, auth_msg);
-#endif
+	gcs().send_text(MAV_SEVERITY_INFO, &auth_msg[0]);
 
 		//	20180418		 
 /*	printf("0123456789%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c%c\n",	 \

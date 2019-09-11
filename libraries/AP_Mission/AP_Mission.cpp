@@ -2409,6 +2409,7 @@ void AP_Mission :: send_mission_breakpoint(mavlink_channel_t chan,int16_t sysid_
 {
     mavlink_command_int_t packet_cmd;
     mavlink_mission_item_int_t packet_mis;
+	memset( & packet_mis, 0, sizeof(packet_mis));
 
     int16_t breakpoint_index = get_nav_breakpoint_cmd().index - get_breakpoint_offset();
 	
