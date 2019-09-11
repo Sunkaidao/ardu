@@ -240,6 +240,8 @@ public:
     /// return the crosstrack_error - horizontal error of the actual position vs the desired position
     float crosstrack_error() const { return _track_error_xy;}
 
+	void clear_wp_last_update(){ _wp_last_update = 0;} //baiyang added in 20190911
+
     static const struct AP_Param::GroupInfo var_info[];
 
 protected:
