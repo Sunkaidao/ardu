@@ -5,6 +5,7 @@
 #include <AP_Terrain/AP_Terrain.h>
 #include <GCS_MAVLink/GCS.h>
 #include <AP_AHRS/AP_AHRS.h>
+#include <AP_Logger/AP_Logger.h>
 
 const AP_Param::GroupInfo AP_Mission::var_info[] = {
 
@@ -151,6 +152,19 @@ void AP_Mission::resume()
         set_current_cmd(_nav_cmd.index);
     }
 
+    AP::logger().Write("MIS",
+                       "TimeUS,DoCmd,NavCmd,DoId,DoIdx,NavId,NavIdx,Sta",
+                       "s???????",
+                       "F-------",
+                       "QBBHHHHB",
+                       AP_HAL::micros64(),
+                       _flags.do_cmd_loaded,
+                       _flags.nav_cmd_loaded,
+                       _do_cmd.id,
+                       _do_cmd.index,
+                       _nav_cmd.id,
+                       _nav_cmd.index,
+                       _flags.state);
     // Note: if there is no active command then the mission must have been stopped just after the previous nav command completed
     //      update will take care of finding and starting the nav command
 }
@@ -213,7 +227,8 @@ void AP_Mission::reset()
     //_breakpoint.index is insert position, not actual position of the breakpoint.
     if (_breakpoint.index != 0 && _breakpoint.index < _cmd_total)
     {
-    	_nav_cmd.index = _breakpoint.index - 1;
+        _nav_cmd.index = _breakpoint.index;
+		_flags.nav_cmd_loaded   = true;
     }
     //added end
 }
