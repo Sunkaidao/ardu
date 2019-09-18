@@ -304,8 +304,13 @@ bool AC_WPNav::set_wp_origin_and_destination(const Vector3f& origin, const Vecto
         }
     }
 
+    Vector3f target_pos = origin + Vector3f(0,0,origin_terr_offset);
     // initialise intermediate point to the origin
-    _pos_control.set_pos_target(origin + Vector3f(0,0,origin_terr_offset));
+    if (is_zero(throttle_alt_offset)) {
+        _pos_control.set_pos_target(target_pos);
+	}else {
+        _pos_control.set_xy_target(target_pos.x, target_pos.y);
+	}
     _track_desired = 0;             // target is at beginning of track
     _flags.reached_destination = false;
     _flags.fast_waypoint = false;   // default waypoint back to slow
@@ -359,8 +364,13 @@ bool AC_WPNav::set_wp_origin_and_destination_smooth(const Vector3f& origin, cons
         }
     }
 
+    Vector3f target_pos = origin + Vector3f(0,0,origin_terr_offset);
     // initialise intermediate point to the origin
-    _pos_control.set_pos_target(origin + Vector3f(0,0,origin_terr_offset));
+    if (is_zero(throttle_alt_offset)) {
+        _pos_control.set_pos_target(target_pos);
+	}else {
+        _pos_control.set_xy_target(target_pos.x, target_pos.y);
+	}
     _track_desired = 0;             // target is at beginning of track
     _flags.reached_destination = false;
     _flags.fast_waypoint = false;   // default waypoint back to slow
