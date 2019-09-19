@@ -683,6 +683,7 @@ bool AP_Mission::stored_in_location(uint16_t id)
     case MAV_CMD_NAV_VTOL_TAKEOFF:
     case MAV_CMD_NAV_VTOL_LAND:
     case MAV_CMD_NAV_PAYLOAD_PLACE:
+	case MAV_CMD_NAV_CIRCLE_LOOSE:
         return true;
     default:
         return false;
@@ -870,7 +871,27 @@ MAV_MISSION_RESULT AP_Mission::mavlink_int_to_mission_cmd(const mavlink_mission_
     case MAV_CMD_NAV_TAKEOFF:                           // MAV ID: 22
         cmd.p1 = packet.param1;                         // minimum pitch (plane only)
         break;
+	
+    case MAV_CMD_NAV_CIRCLE_LOOSE:                      // MAV ID: 29
+	{
+		/*
+		  the 15 byte limit means we can't fit both delay and radius
+		  in the cmd structure. When we expand the mission structure
+		  we can do this properly
+		 */
 
+		// acceptance radius in meters and pass by distance in meters
+		uint16_t move_mode = packet.param1;			// param 2 is acceptance radius in meters is held in low p1
+		uint16_t move_direction = packet.param2;		// param 3 is pass by distance in meters is held in high p1
+		
+		// limit to 255 so it does not wrap during the shift or mask operation
+		move_mode = move_mode & 0x0001;
+		move_direction = move_direction & 0x0001;
+		
+		cmd.p1 = (move_direction << 1) | move_mode;
+	}
+		break;
+	
     case MAV_CMD_NAV_CONTINUE_AND_CHANGE_ALT:           // MAV ID: 30
         cmd.p1 = packet.param1;                         // Climb/Descend
                         // 0 = Neutral, cmd complete at +/- 5 of indicated alt.
@@ -1300,7 +1321,12 @@ bool AP_Mission::mission_cmd_to_mavlink_int(const AP_Mission::Mission_Command& c
     case MAV_CMD_NAV_TAKEOFF:                           // MAV ID: 22
         packet.param1 = cmd.p1;                         // minimum pitch (plane only)
         break;
-
+	
+    case MAV_CMD_NAV_CIRCLE_LOOSE:                                            // MAV ID: 29
+        packet.param1 = cmd.p1 & 0x0001;
+		packet.param2 = (cmd.p1 & 0x0002) >> 1;
+        break;
+		
     case MAV_CMD_NAV_CONTINUE_AND_CHANGE_ALT:           // MAV ID: 30
         packet.param1 = cmd.p1;                         // Climb/Descend
                         // 0 = Neutral, cmd complete at +/- 5 of indicated alt.

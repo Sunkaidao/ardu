@@ -83,6 +83,10 @@ void ModeAuto::run()
         circle_run();
         break;
 
+    case Auto_ZigZagAb:
+        zigzag_ab_run();
+        break;
+
     case Auto_Spline:
         spline_run();
         break;
@@ -445,6 +449,59 @@ bool ModeAuto::start_command(const AP_Mission::Mission_Command& cmd)
     case MAV_CMD_NAV_RETURN_TO_LAUNCH:             //20
         do_RTL();
         break;
+	
+	case MAV_CMD_NAV_CIRCLE_LOOSE:                 // 29  Navigate to Waypoint
+	    if (cmd.p1 & 0x0001)
+	    {
+	        float radius_cm = 0;
+	        AP_Mission::Mission_Command circle_center;
+	        AP_Mission::Mission_Command cmd1;
+            AP_Mission::Mission_Command cmd2 = mission.get_current_nav_cmd();
+			mission.get_next_nav_cmd(mission.get_prev_nav_cmd_index(), cmd1);
+
+			Vector3f dest1_neu;
+			Vector3f dest2_neu;
+			
+			if (!cmd1.content.location.get_vector_from_origin_NEU(dest1_neu) ||
+			    !cmd2.content.location.get_vector_from_origin_NEU(dest2_neu)) {
+                break;
+			}
+
+            radius_cm = (dest1_neu - dest2_neu).length()/2.0f;
+			
+			Vector3f cen_ned = (dest1_neu + dest2_neu) / 2;
+			
+			Location temp(cen_ned);
+			circle_center.id = MAV_CMD_NAV_LOITER_TURNS;
+	        circle_center.content.location = temp;		
+		
+     		circle_center.content.location.loiter_ccw = (cmd.p1 & 0x0002) >> 1;
+
+
+            cmd1 = cmd2;
+			mission.get_next_nav_cmd(mission.get_current_nav_index() + 1, cmd2);
+
+			if (!cmd1.content.location.get_vector_from_origin_NEU(dest1_neu) ||
+			    !cmd2.content.location.get_vector_from_origin_NEU(dest2_neu)) {
+                break;
+			}
+
+			pos_delta_unit = dest2_neu - dest1_neu;
+			pos_delta_unit.z = 0;
+			
+			pos_delta_unit.normalize();
+			
+			circle_center.p1 = radius_cm;
+			do_circle_loose(circle_center);
+	    }
+		else
+		{
+		    AP_Mission::Mission_Command cmd_tmp = cmd;
+			cmd_tmp.id = MAV_CMD_NAV_SPLINE_WAYPOINT;
+			
+		    do_nav_wp_smooth(cmd_tmp);
+		}
+        break;
 
     case MAV_CMD_NAV_SPLINE_WAYPOINT:           // 82  Navigate to Waypoint using spline
         do_spline_wp(cmd);
@@ -654,7 +711,10 @@ bool ModeAuto::verify_command(const AP_Mission::Mission_Command& cmd)
     case MAV_CMD_NAV_WAYPOINT:
         cmd_complete = verify_nav_wp(cmd);
         break;
-
+	
+    case MAV_CMD_NAV_CIRCLE_LOOSE:
+        return verify_zigzag_ab(cmd);
+		
     case MAV_CMD_NAV_LAND:
         cmd_complete = verify_land();
         break;
@@ -888,6 +948,13 @@ void ModeAuto::circle_run()
         // roll, pitch from waypoint controller, yaw heading from auto_heading()
         attitude_control->input_euler_angle_roll_pitch_yaw(copter.circle_nav->get_roll(), copter.circle_nav->get_pitch(), auto_yaw.yaw(), true);
     }
+}
+
+// auto_circle_run - circle in AUTO flight mode
+//      called by auto_run at 100hz or more
+void ModeAuto::zigzag_ab_run()
+{
+    copter.mode_zigzag_ab.run();
 }
 
 #if NAV_GUIDED == ENABLED
@@ -1178,6 +1245,13 @@ void ModeAuto::do_nav_wp(const AP_Mission::Mission_Command& cmd)
     }
 }
 
+// do_nav_wp_smooth - initiate move to next waypoint
+void ModeAuto::do_nav_wp_smooth(const AP_Mission::Mission_Command& cmd)
+{
+    _mode = Auto_ZigZagAb;
+    copter.mode_zigzag_ab.do_nav_wp_smooth(cmd);
+}
+
 // do_land - initiate landing procedure
 void ModeAuto::do_land(const AP_Mission::Mission_Command& cmd)
 {
@@ -1245,6 +1319,13 @@ void ModeAuto::do_circle(const AP_Mission::Mission_Command& cmd)
 
     // move to edge of circle (verify_circle) will ensure we begin circling once we reach the edge
     circle_movetoedge_start(circle_center, circle_radius_m);
+}
+
+// do_circle_loose - initiate moving in a circle
+void ModeAuto::do_circle_loose(const AP_Mission::Mission_Command& cmd)
+{
+    _mode = Auto_ZigZagAb;
+    copter.mode_zigzag_ab.do_circle(cmd);
 }
 
 // do_loiter_time - initiate loitering at a point for a given time period
@@ -1919,5 +2000,43 @@ bool ModeAuto::verify_nav_delay(const AP_Mission::Mission_Command& cmd)
     }
     return false;
 }
+
+// verify_zigzag_ab - check if we have waited long enough
+bool ModeAuto::verify_zigzag_ab(const AP_Mission::Mission_Command& cmd)
+{
+    bool res = false;
+
+	if (!(cmd.p1 & 0x0001) && cmd.id == MAV_CMD_NAV_CIRCLE_LOOSE) {
+		res = copter.mode_zigzag_ab.verify_spline_wp(cmd);
+	}else if ((cmd.p1 & 0x0001) && cmd.id == MAV_CMD_NAV_CIRCLE_LOOSE){
+		res = verify_circle_loose(cmd);
+	}
+	
+    return res;
+}
+
+// verify_circle_loose - check if we have waited long enough
+bool ModeAuto::verify_circle_loose(const AP_Mission::Mission_Command& cmd)
+{
+    int16_t turn_angle = copter.mode_zigzag_ab.mission.get_turn_angle();
+	float speed_angle = copter.mode_zigzag_ab.mission.get_speed_angle();
+
+	Vector3f curr_vel = inertial_nav.get_velocity();
+	
+	curr_vel.z = 0;
+	curr_vel.normalize();
+	
+	float curr_spd_rad = atan2f(curr_vel.y,curr_vel.x);
+	curr_spd_rad = wrap_PI(curr_spd_rad);
+	
+	float curr_pos_rad = atan2f(pos_delta_unit.y,pos_delta_unit.x);
+	curr_pos_rad = wrap_PI(curr_pos_rad);
+	
+	float curr_spd_pos_angle = ToDeg(wrap_PI(curr_spd_rad - curr_pos_rad));
+	bool pass_spd = ((cmd.p1 >> 1) & 0x0001) == true ? curr_spd_pos_angle < speed_angle : curr_spd_pos_angle > -speed_angle;
+
+	return (copter.circle_nav->get_angle_total()/M_2PI*360 >= (float)turn_angle) && pass_spd;
+}
+
 
 #endif
