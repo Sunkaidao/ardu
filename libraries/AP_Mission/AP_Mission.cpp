@@ -1074,6 +1074,12 @@ MAV_MISSION_RESULT AP_Mission::mavlink_int_to_mission_cmd(const mavlink_mission_
         cmd.p1 = packet.param1*100; // copy max-descend parameter (m->cm)
         break;
 
+    //added by ZhangYong 20170717
+    case MAV_CMD_DO_SPRAYER:
+        cmd.p1 = packet.param1; 
+        break;
+    //added end
+
     case MAV_CMD_NAV_SET_YAW_SPEED:
         cmd.content.set_yaw_speed.angle_deg = packet.param1;        // target angle in degrees
         cmd.content.set_yaw_speed.speed = packet.param2;            // speed in meters/second
@@ -1510,6 +1516,12 @@ bool AP_Mission::mission_cmd_to_mavlink_int(const AP_Mission::Mission_Command& c
     case MAV_CMD_NAV_PAYLOAD_PLACE:
         packet.param1 = cmd.p1/100.0f; // copy max-descend parameter (m->cm)
         break;
+
+    //added by ZhangYong
+    case MAV_CMD_DO_SPRAYER:
+        packet.param1 = cmd.p1;
+        break;
+    //added end
 
     case MAV_CMD_NAV_SET_YAW_SPEED:
         packet.param1 = cmd.content.set_yaw_speed.angle_deg;        // target angle in degrees

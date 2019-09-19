@@ -49,6 +49,14 @@ const AP_Param::GroupInfo AC_Sprayer::var_info[] = {
     // @User: Standard
     AP_GROUPINFO("PUMP_MIN",   4, AC_Sprayer, _pump_min_pct, AC_SPRAYER_DEFAULT_PUMP_MIN),
 
+	// @Param: UNSPY_DIST
+	// @DisplayName: unsprayer distance
+	// @Description: 
+	// @Units: cm
+	// @Range: 0 5000
+	// @User: Standard
+	AP_GROUPINFO("UNSPY_DIST",	5, AC_Sprayer, _unspray_dist, AC_SPRAYER_DEFAULT_UNSPRAY_DISTANCE),
+
     AP_GROUPEND
 };
 
