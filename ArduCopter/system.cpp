@@ -160,7 +160,7 @@ void Copter::init_ardupilot()
 
 #if MOUNT == ENABLED
     // initialise camera mount
-    camera_mount.init(serial_manager);
+    camera_mount.init();
 #endif
 
 #if PRECISION_LANDING == ENABLED
@@ -647,6 +647,8 @@ bool Copter::is_tradheli() const
 MAV_RESULT Copter::handle_command_auth_protoca_ahead(const mavlink_command_long_t &packet)
 {
 	MAV_RESULT result = MAV_RESULT_FAILED;
+
+#if FXTX_AUTH == ENABLED
 	union auth_id_para id_para;
 		
 	uint8_t lcl_counter;
@@ -745,7 +747,8 @@ MAV_RESULT Copter::handle_command_auth_protoca_ahead(const mavlink_command_long_
 			break;
 		}
 	}
-
+#endif
 	return result;		
-}
+
+}
 

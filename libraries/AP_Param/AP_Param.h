@@ -349,6 +349,12 @@ public:
     ///
     static bool load_all();
 
+    // returns storage space used:
+    static uint16_t storage_used() { return sentinal_offset; }
+
+    // returns storage space :
+    static uint16_t storage_size() { return _storage.size(); }
+
     /// reoad the hal.util defaults file. Called after pointer parameters have been allocated
     ///
     static void reload_defaults_file(bool last_pass);
@@ -470,6 +476,8 @@ private:
         uint8_t spare;
     };
 
+    static uint16_t sentinal_offset;
+
 /* This header is prepended to a variable stored in EEPROM.
  *  The meaning is as follows:
  *
@@ -503,6 +511,7 @@ private:
     /*
       structure for built-in defaults file that can be modified using apj_tool.py
      */
+#if AP_PARAM_MAX_EMBEDDED_PARAM > 0
     struct PACKED param_defaults_struct {
         char magic_str[8];
         uint8_t param_magic[8];
@@ -511,6 +520,7 @@ private:
         volatile char data[AP_PARAM_MAX_EMBEDDED_PARAM];
     };
     static const param_defaults_struct param_defaults_data;
+#endif
 
 
     static bool                 check_group_info(const struct GroupInfo *group_info, uint16_t *total_size, 

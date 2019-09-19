@@ -289,7 +289,13 @@ bool GCS_MAVLINK_Copter::try_send_message(enum ap_message id)
 #endif
         break;
     }
-
+	
+    case MSG_COMMAND_INT:
+#if CONFIG_HAL_BOARD != HAL_BOARD_SITL
+		CHECK_PAYLOAD_SIZE(COMMAND_INT);
+		copter.mode_auto.mission.send_mission_breakpoint(chan,copter.g.sysid_this_mav);
+#endif
+		break;
     default:
         return GCS_MAVLINK::try_send_message(id);
     }
@@ -411,6 +417,7 @@ static const ap_message STREAM_EXTENDED_STATUS_msgs[] = {
     MSG_NAV_CONTROLLER_OUTPUT,
     MSG_FENCE_STATUS,
     MSG_POSITION_TARGET_GLOBAL_INT,
+    MSG_COMMAND_INT
 };
 static const ap_message STREAM_POSITION_msgs[] = {
     MSG_LOCATION,
@@ -860,12 +867,9 @@ MAV_RESULT GCS_MAVLINK_Copter::handle_command_long_packet(const mavlink_command_
     }
 }
 
-
-
-
-
 void GCS_MAVLINK_Copter::handle_command_auth_protoca_post(const mavlink_command_long_t &packet, MAV_RESULT result)
 {
+#if FXTX_AUTH == ENABLED
 	if(MAV_CMD_AUTH_PROTOCAL == packet.command)
    	{
 
@@ -903,8 +907,8 @@ void GCS_MAVLINK_Copter::handle_command_auth_protoca_post(const mavlink_command_
 
 		}
    	}
-}
-
+#endif
+}
 
 void GCS_MAVLINK_Copter::handle_mount_message(const mavlink_message_t &msg)
 {
@@ -972,8 +976,9 @@ void GCS_MAVLINK_Copter::handleMessage(const mavlink_message_t &msg)
 	
 				// send ACK or NAK
 				mavlink_msg_command_ack_send(chan, packet.command, result);
-			
+#if FXTX_AUTH == ENABLED			
 				handle_command_auth_protoca_post(packet, result);
+#endif
 			}
 			default:
 			{

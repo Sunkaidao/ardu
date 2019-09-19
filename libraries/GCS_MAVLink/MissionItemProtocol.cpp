@@ -49,7 +49,7 @@ void MissionItemProtocol::handle_mission_count(
     GCS_MAVLINK &_link,
     const mavlink_mission_count_t &packet,
     const mavlink_message_t &msg)
-{
+{	
     if (!mavlink2_requirement_met(_link, msg)) {
         return;
     }

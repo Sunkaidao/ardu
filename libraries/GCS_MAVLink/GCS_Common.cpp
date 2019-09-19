@@ -592,18 +592,14 @@ void GCS_MAVLINK::handle_param_value(const mavlink_message_t &msg)
     mount->handle_param_value(msg);
 }
 
-void GCS_MAVLINK::send_textv(MAV_SEVERITY severity, const char *fmt, va_list arg_list) const
-{
-    char text[MAVLINK_MSG_STATUSTEXT_FIELD_TEXT_LEN+1];
-    hal.util->vsnprintf(text, sizeof(text), fmt, arg_list);
-    gcs().send_statustext(severity, (1<<chan), text);
-}
 void GCS_MAVLINK::send_text(MAV_SEVERITY severity, const char *fmt, ...) const
 {
+    char text[MAVLINK_MSG_STATUSTEXT_FIELD_TEXT_LEN+1];
     va_list arg_list;
     va_start(arg_list, fmt);
-    send_textv(severity, fmt, arg_list);
+    hal.util->vsnprintf(text, sizeof(text), fmt, arg_list);
     va_end(arg_list);
+    gcs().send_statustext(severity, (1<<chan), text);
 }
 
 void GCS_MAVLINK::handle_radio_status(const mavlink_message_t &msg, bool log_radio)
@@ -785,6 +781,7 @@ ap_message GCS_MAVLINK::mavlink_id_to_ap_message_id(const uint32_t mavlink_id) c
         { MAVLINK_MSG_ID_DEEPSTALL,             MSG_LANDING},
         { MAVLINK_MSG_ID_EXTENDED_SYS_STATE,    MSG_EXTENDED_SYS_STATE},
         { MAVLINK_MSG_ID_AUTOPILOT_VERSION,     MSG_AUTOPILOT_VERSION},
+        { MAVLINK_MSG_ID_COMMAND_INT,           MSG_COMMAND_INT},
             };
 
     for (uint8_t i=0; i<ARRAY_SIZE(map); i++) {
@@ -2480,7 +2477,6 @@ MAV_RESULT GCS_MAVLINK::handle_preflight_reboot(const mavlink_command_long_t &pa
     }
     // force safety on
     hal.rcout->force_safety_on();
-    hal.rcout->force_safety_no_wait();
 
     // flush pending parameter writes
     AP_Param::flush();
@@ -2904,6 +2900,21 @@ void GCS_MAVLINK::handle_command_ack(const mavlink_message_t &msg)
     AP_AccelCal *accelcal = AP::ins().get_acal();
     if (accelcal != nullptr) {
         accelcal->handleMessage(msg);
+    }
+
+	mavlink_command_ack_t packet;
+    mavlink_msg_command_ack_decode(&msg,&packet);
+
+    switch (packet.command) {
+
+        case MAV_CMD_NAV_BREAK_WAYPOINT:      // CMD ID: 28
+        {
+            if (packet.result == MAV_RESULT_ACCEPTED)
+            {
+        	    AP::mission()->set_send_breakpoint(false);
+            }
+            break;
+        }
     }
 }
 
@@ -3688,6 +3699,40 @@ void GCS_MAVLINK::handle_command_auth_protoca_post(const mavlink_command_long_t 
 {
 }
 
+bool GCS_MAVLINK::command_long_stores_location(const MAV_CMD command)
+{
+    switch(command) {
+    case MAV_CMD_DO_SET_HOME:
+    case MAV_CMD_DO_SET_ROI:
+    case MAV_CMD_NAV_TAKEOFF:
+        return true;
+    default:
+        return false;
+    }
+    return false;
+}
+
+void GCS_MAVLINK::convert_COMMAND_LONG_to_COMMAND_INT(const mavlink_command_long_t &in, mavlink_command_int_t &out)
+{
+    out.target_system = in.target_system;
+    out.target_component = in.target_component;
+    out.frame = MAV_FRAME_GLOBAL_RELATIVE_ALT; // FIXME?
+    out.command = in.command;
+    out.current = 0;
+    out.autocontinue = 0;
+    out.param1 = in.param1;
+    out.param2 = in.param2;
+    out.param3 = in.param3;
+    out.param4 = in.param4;
+    if (command_long_stores_location((MAV_CMD)in.command)) {
+        out.x = in.param5 *1e7;
+        out.y = in.param6 *1e7;
+    } else {
+        out.x = in.param5;
+        out.y = in.param6;
+    }
+    out.z = in.param7;
+}
 
 void GCS_MAVLINK::handle_command_long(const mavlink_message_t &msg)
 {
@@ -3701,8 +3746,6 @@ void GCS_MAVLINK::handle_command_long(const mavlink_message_t &msg)
 
     // send ACK or NAK
     mavlink_msg_command_ack_send(chan, packet.command, result);
-
-	handle_command_auth_protoca_post(packet, result);
 
     hal.util->persistent_data.last_mavlink_cmd = 0;
 }
@@ -3824,6 +3867,8 @@ void GCS_MAVLINK::handle_command_int(const mavlink_message_t &msg)
 
     // send ACK or NAK
     mavlink_msg_command_ack_send(chan, packet.command, result);
+
+    AP::logger().Write_Command(packet, result);
 
     hal.util->persistent_data.last_mavlink_cmd = 0;
 }

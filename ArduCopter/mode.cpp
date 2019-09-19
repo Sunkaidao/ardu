@@ -120,6 +120,9 @@ Mode *Copter::mode_from_mode_num(const uint8_t mode)
 #if MODE_THROW_ENABLED == ENABLED
         case THROW:
             ret = &mode_throw;
+#if CONFIG_HAL_BOARD == HAL_BOARD_SITL
+            ret = &mode_zigzag_ab;
+#endif
             break;
 #endif
 
@@ -156,6 +159,12 @@ Mode *Copter::mode_from_mode_num(const uint8_t mode)
 #if MODE_ZIGZAG_ENABLED == ENABLED
         case ZIGZAG:
             ret = &mode_zigzag;
+            break;
+#endif
+
+#if MODE_ZIGZAG_ENABLED == ENABLED
+        case ZIGZAG_AB:
+            ret = &mode_zigzag_ab;
             break;
 #endif
 
@@ -204,9 +213,15 @@ bool Copter::set_mode(control_mode_t mode, mode_reason_t reason)
     // into a manual throttle mode from a non-manual-throttle mode
     // (e.g. user arms in guided, raises throttle to 1300 (not enough to
     // trigger auto takeoff), then switches into manual):
+    bool user_throttle = new_flightmode->has_manual_throttle();
+#if MODE_DRIFT_ENABLED == ENABLED
+    if (new_flightmode == &mode_drift) {
+        user_throttle = true;
+    }
+#endif
     if (!ignore_checks &&
         ap.land_complete &&
-        (new_flightmode->has_manual_throttle() || new_flightmode == &mode_drift) &&
+        user_throttle &&
         !copter.flightmode->has_manual_throttle() &&
         new_flightmode->get_pilot_desired_throttle() > copter.get_non_takeoff_throttle()) {
         gcs().send_text(MAV_SEVERITY_WARNING, "Mode change failed: throttle too high");
@@ -283,13 +298,49 @@ void Copter::exit_mode(Mode *&old_flightmode,
     // stop mission when we leave auto mode
 #if MODE_AUTO_ENABLED == ENABLED
     if (old_flightmode == &mode_auto) {
+		if (mode_auto.mission.state() == AP_Mission::MISSION_COMPLETE) {
+			mode_auto.mission.set_breakpoint_valid(false);
+		 }
+		
         if (mode_auto.mission.state() == AP_Mission::MISSION_RUNNING) {
+			if (motors->armed()) {
+	            if (!mode_auto.mission.record_breakpoint()) {
+					mode_auto.mission.set_breakpoint_valid(false);
+	            }
+            }
             mode_auto.mission.stop();
         }
 #if MOUNT == ENABLED
         camera_mount.set_mode_to_default();
 #endif  // MOUNT == ENABLED
     }
+#endif
+
+    // stop mission when we leave auto mode
+#if MODE_ZIGZAG_AB_ENABLED == ENABLED
+    if (old_flightmode == &mode_zigzag_ab) {
+		mode_zigzag_ab.mission.record_break_point();
+        mode_zigzag_ab.mission.abmode_reset();
+    }
+
+	if (old_flightmode == &mode_zigzag_ab && \
+		(new_flightmode == &mode_stabilize || \
+		new_flightmode == &mode_althold || \
+		new_flightmode == &mode_loiter || \
+		new_flightmode == &mode_poshold) && \
+		motors->armed()) 
+	{
+		mode_zigzag_ab.mission.set_break_mode(2);
+        mode_zigzag_ab.mission.set_relay_spray();
+    }else if (old_flightmode == &mode_zigzag_ab && \
+		(new_flightmode == &mode_rtl || \
+		new_flightmode == &mode_auto || \
+		new_flightmode == &mode_guided) && \
+		motors->armed()) 
+	{
+        mode_zigzag_ab.mission.set_break_mode(1);
+        mode_zigzag_ab.mission.set_relay_spray();
+	}
 #endif
 
     // smooth throttle transition when switching from manual to automatic flight modes

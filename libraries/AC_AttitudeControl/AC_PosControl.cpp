@@ -828,6 +828,31 @@ void AC_PosControl::init_xy_controller()
     init_ekf_xy_reset();
 }
 
+/// init_xy_controller - initialise the xy controller
+///     this should be called after setting the position target and the desired velocity and acceleration
+///     sets target roll angle, pitch angle and I terms based on vehicle current lean angles
+///     should be called once whenever significant changes to the position target are made
+///     this does not update the xy target
+void AC_PosControl::init_xy_controller_smooth()
+{
+    // set roll, pitch lean angle targets to current attitude
+    // todo: this should probably be based on the desired attitude not the current attitude
+    _roll_target = _ahrs.roll_sensor;
+    _pitch_target = _ahrs.pitch_sensor;
+
+    // initialise I terms from lean angles
+    _pid_vel_xy.reset_filter();
+    _accel_target.zero();
+    _pid_vel_xy.set_integrator(_accel_target - _accel_desired);
+
+    // flag reset required in rate to accel step
+    _flags.reset_desired_vel_to_pos = true;
+    _flags.reset_accel_to_lean_xy = true;
+
+    // initialise ekf xy reset handler
+    init_ekf_xy_reset();
+}
+
 /// update_xy_controller - run the horizontal position controller - should be called at 100hz or higher
 void AC_PosControl::update_xy_controller()
 {
@@ -874,10 +899,10 @@ void AC_PosControl::write_log()
     lean_angles_to_accel(accel_x, accel_y);
 
     AP::logger().Write("PSC",
-                       "TimeUS,TPX,TPY,PX,PY,TVX,TVY,VX,VY,TAX,TAY,AX,AY,TAltO",
-                       "smmmmnnnnoooom",
-                       "F0000000000000",
-                       "Qfffffffffffff",
+                       "TimeUS,TPX,TPY,PX,PY,TVX,TVY,VX,VY,TAX,TAY,AX,AY,TAltO,Dz",
+                       "smmmmnnnnoooomn",
+                       "F0000000000000B",
+                       "Qffffffffffffff",
                        AP_HAL::micros64(),
                        double(pos_target.x * 0.01f),
                        double(pos_target.y * 0.01f),
@@ -891,7 +916,8 @@ void AC_PosControl::write_log()
                        double(accel_target.y * 0.01f),
                        double(accel_x * 0.01f),
                        double(accel_y * 0.01f),
-                       double(_throttle_alt_offset * 0.01f));
+                       double(_throttle_alt_offset * 0.01f),
+                       _vel_desired.z);
 }
 
 /// init_vel_controller_xyz - initialise the velocity controller - should be called once before the caller attempts to use the controller

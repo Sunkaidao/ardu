@@ -271,6 +271,18 @@ public:
         const char *type() const;
     };
 
+    // breakpoint structure
+    struct Break_Point {
+        AP_Int16 index;
+        AP_Int8 offset;
+        int8_t operation_type;    //0:insert,1:modify
+        int32_t lat;
+        int32_t lng;
+        Yaw_Command yaw;
+        Change_Speed_Command speed;
+        uint8_t breakpoint_valid       : 1; // true if the breakpoint is recorded
+        uint8_t send_breakpoint        : 1; // true if the breakpoint should be sended 
+    };
 
     // main program function pointers
     FUNCTOR_TYPEDEF(mission_cmd_fn_t, bool, const Mission_Command&);
@@ -304,6 +316,14 @@ public:
         _flags.state = MISSION_STOPPED;
         _flags.nav_cmd_loaded = false;
         _flags.do_cmd_loaded = false;
+
+        _breakpoint.breakpoint_valid = false;
+        _breakpoint.send_breakpoint = false;
+		overrange = false;
+		memset( & _cmd_yaw, 0, sizeof(_cmd_yaw));
+        memset( & _cmd_speed, 0, sizeof(_cmd_speed));
+        memset( & _cmd_do_spray, 0, sizeof(_cmd_do_spray));
+        memset( & _nav_breakpoint_cmd, 0, sizeof(_nav_breakpoint_cmd));
     }
 
     // get singleton instance
@@ -481,6 +501,44 @@ public:
     // returns true if the mission contains the requested items
     bool contains_item(MAV_CMD command) const;
 
+    bool get_breakpoint_valid() const { return _breakpoint.breakpoint_valid; }
+
+    void set_breakpoint_valid(bool b) { _breakpoint.breakpoint_valid = b; }
+
+    bool record_breakpoint();
+
+    int8_t regenerate_airline();
+
+    void clear_b_index() { _breakpoint.index.set_and_save_ifchanged(0);}
+
+    void update_spray_configuration();
+
+    void find_first_waypoint();
+
+//baiyang added in 20180817
+    void set_send_breakpoint(bool b) { _breakpoint.send_breakpoint = b; }
+
+    bool get_send_breakpoint() const { return _breakpoint.send_breakpoint; }
+
+    int8_t get_insert_mask() { return insert_mask; }
+
+    /// get_nav_breakpoint_cmd - returns the breakpoint nav command
+    const Mission_Command& get_nav_breakpoint_cmd() const { return _nav_breakpoint_cmd; }
+
+    int16_t get_breakpoint_index() { return _breakpoint.index.get(); }
+
+    int8_t get_breakpoint_offset() { return _breakpoint.offset.get(); }
+//added end
+
+	int8_t get_breakpoint_type() { return _breakpoint.operation_type; }
+
+    Location get_breakpoint_online(const Location &position_pre,const Location &position_behind);
+
+	int8_t is_breakpoint_overrange(int16_t range_m);
+	bool get_overrange();
+
+	void send_mission_breakpoint(mavlink_channel_t chan,int16_t sysid_this_mav);
+	
     // user settable parameters
     static const struct AP_Param::GroupInfo var_info[];
 
@@ -587,6 +645,17 @@ private:
     bool start_command_do_servorelayevents(const AP_Mission::Mission_Command& cmd);
     bool start_command_camera(const AP_Mission::Mission_Command& cmd);
     bool start_command_parachute(const AP_Mission::Mission_Command& cmd);
+
+	///baiyang added in 20190910
+    struct Mission_Command  _cmd_yaw;   //Used to regenerate routes for breakpoints
+    struct Mission_Command  _cmd_speed; //Used to regenerate routes for breakpoints
+    struct Mission_Command  _cmd_do_spray; //Used to regenerate routes for breakpoints
+    struct Mission_Command  _nav_breakpoint_cmd; //Used to regenerate routes for breakpoints
+    struct Break_Point      _breakpoint;
+	uint16_t                _first_nav_cmd_index;   // The first navigation waypoint in the route
+    int8_t                  insert_mask;
+	
+	bool overrange;
 };
 
 namespace AP {

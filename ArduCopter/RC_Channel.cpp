@@ -65,7 +65,6 @@ void RC_Channel_Copter::init_aux_function(const aux_func_t ch_option, const aux_
     switch(ch_option) {
     case AUX_FUNC::SIMPLE_MODE:
     case AUX_FUNC::RANGEFINDER:
-    case AUX_FUNC::FENCE:
     case AUX_FUNC::SUPERSIMPLE_MODE:
     case AUX_FUNC::ACRO_TRAINER:
     case AUX_FUNC::PARACHUTE_ENABLE:
@@ -241,19 +240,6 @@ void RC_Channel_Copter::do_aux_function(const aux_func_t ch_option, const aux_sw
                 copter.rangefinder_state.enabled = true;
             } else {
                 copter.rangefinder_state.enabled = false;
-            }
-#endif
-            break;
-
-        case AUX_FUNC::FENCE:
-#if AC_FENCE == ENABLED
-            // enable or disable the fence
-            if (ch_flag == HIGH) {
-                copter.fence.enable(true);
-                copter.Log_Write_Event(DATA_FENCE_ENABLE);
-            } else {
-                copter.fence.enable(false);
-                copter.Log_Write_Event(DATA_FENCE_DISABLE);
             }
 #endif
             break;
@@ -554,6 +540,26 @@ void RC_Channel_Copter::do_aux_function(const aux_func_t ch_option, const aux_sw
             do_aux_function_change_mode(control_mode_t::DRIFT, ch_flag);
 #endif
             break;
+
+#if MODE_ZIGZAG_AB_ENABLED == ENABLED
+		case AUX_FUNC::RECORD_ZIGZAG_AB:
+			switch (ch_flag) 
+			{
+				case HIGH:
+					copter.mode_zigzag_ab.mission.abmode_set_pos_b();
+					break;
+				case LOW:
+					copter.mode_zigzag_ab.mission.abmode_set_pos_a();
+					break;
+				default:
+					break;
+			}
+			break;
+
+        case AUX_FUNC::ZIGZAG_AB:
+            do_aux_function_change_mode(control_mode_t::ZIGZAG_AB, ch_flag);
+            break;
+#endif
 
     default:
         RC_Channel::do_aux_function(ch_option, ch_flag);

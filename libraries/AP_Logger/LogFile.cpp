@@ -399,6 +399,32 @@ void AP_Logger::Write_Vibration()
     WriteBlock(&pkt, sizeof(pkt));
 }
 
+void AP_Logger::Write_Command(const mavlink_command_int_t &packet,
+                              const MAV_RESULT result,
+                              bool was_command_long)
+{
+    const struct log_MAVLink_Command pkt{
+        LOG_PACKET_HEADER_INIT(LOG_MAVLINK_COMMAND_MSG),
+        time_us         : AP_HAL::micros64(),
+        target_system   : packet.target_system,
+        target_component: packet.target_component,
+        frame           : packet.frame,
+        command         : packet.command,
+        current         : packet.current,
+        autocontinue    : packet.autocontinue,
+        param1          : packet.param1,
+        param2          : packet.param2,
+        param3          : packet.param3,
+        param4          : packet.param4,
+        x               : packet.x,
+        y               : packet.y,
+        z               : packet.z,
+        result          : (uint8_t)result,
+        was_command_long:was_command_long,
+    };
+    return WriteBlock(&pkt, sizeof(pkt));
+}
+
 bool AP_Logger_Backend::Write_Mission_Cmd(const AP_Mission &mission,
                                               const AP_Mission::Mission_Command &cmd)
 {
@@ -418,6 +444,28 @@ bool AP_Logger_Backend::Write_Mission_Cmd(const AP_Mission &mission,
         longitude       : mav_cmd.y,
         altitude        : mav_cmd.z,
         frame           : mav_cmd.frame
+    };
+    return WriteBlock(&pkt, sizeof(pkt));
+}
+
+bool AP_Logger_Backend::Write_Mission_Cmd2(const AP_Mission::Mission_Command &cmd, float vel_desired_z)
+{
+    mavlink_mission_item_int_t mav_cmd = {};
+    AP_Mission::mission_cmd_to_mavlink_int(cmd,mav_cmd);
+    struct log_Cmd2 pkt = {
+        LOG_PACKET_HEADER_INIT(LOG_CMD2_MSG),
+        time_us         : AP_HAL::micros64(),
+        sequence        : mav_cmd.seq,
+        command         : mav_cmd.command,
+        param1          : mav_cmd.param1,
+        param2          : mav_cmd.param2,
+        param3          : mav_cmd.param3,
+        param4          : mav_cmd.param4,
+        latitude        : mav_cmd.x,
+        longitude       : mav_cmd.y,
+        altitude        : mav_cmd.z,
+        frame           : mav_cmd.frame,
+        desired_velocity_z : vel_desired_z
     };
     return WriteBlock(&pkt, sizeof(pkt));
 }
@@ -507,31 +555,6 @@ void AP_Logger::Write_POS(AP_AHRS &ahrs)
     };
     WriteBlock(&pkt, sizeof(pkt));
 }
-
-#if AP_AHRS_NAVEKF_AVAILABLE
-
-
-/*
-  write an EKF timing message
- */
-void AP_Logger::Write_EKF_Timing(const char *name, uint64_t time_us, const struct ekf_timing &timing)
-{
-    Write(name,
-              "TimeUS,Cnt,IMUMin,IMUMax,EKFMin,EKFMax,AngMin,AngMax,VMin,VMax",
-              "QIffffffff",
-              time_us,
-              timing.count,
-              (double)timing.dtIMUavg_min,
-              (double)timing.dtIMUavg_max,
-              (double)timing.dtEKFavg_min,
-              (double)timing.dtEKFavg_max,
-              (double)timing.delAngDT_min,
-              (double)timing.delAngDT_max,
-              (double)timing.delVelDT_min,
-              (double)timing.delVelDT_max);
-}
-
-#endif
 
 void AP_Logger::Write_Radio(const mavlink_radio_t &packet)
 {
