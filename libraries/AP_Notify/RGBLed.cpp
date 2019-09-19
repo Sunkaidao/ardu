@@ -20,8 +20,12 @@
 #include <AP_GPS/AP_GPS.h>
 #include "RGBLed.h"
 #include "AP_Notify.h"
+#include <../././ArduCopter/defines.h>
 
 extern const AP_HAL::HAL& hal;
+
+
+
 
 RGBLed::RGBLed(uint8_t led_off, uint8_t led_bright, uint8_t led_medium, uint8_t led_dim):
     _led_off(led_off),
@@ -140,27 +144,155 @@ uint32_t RGBLed::get_colour_sequence(void) const
 
     // solid green or blue if armed
     if (AP_Notify::flags.armed) {
+        //  modifid by zhangyong 20190919
+        /*
         // solid green if armed with GPS 3d lock
         if (AP_Notify::flags.gps_status >= AP_GPS::GPS_OK_FIX_3D) {
             return sequence_armed;
         }
         // solid blue if armed with no GPS lock
         return sequence_armed_nogps;
+        */
+        switch(AP_Notify::flags.flight_mode)
+        {
+            case STABILIZE:
+            {
+                return sequence_armed_stabilize;
+            }
+            case ALT_HOLD:
+            case POSHOLD:
+            {
+                return sequence_armed_althold;
+            }
+            case LOITER:
+            {
+                return sequence_armed_loiter;
+            }
+            default:
+            {
+                if (AP_Notify::flags.gps_status >= AP_GPS::GPS_OK_FIX_3D) 
+				{
+                    return sequence_armed_default;
+        		}
+				else
+				{
+            		// solid blue if armed with no GPS lock
+            		return sequence_armed_default_nogps;
+        		}
+            }
+        }
+        
     }
 
     // double flash yellow if failing pre-arm checks
     if (!AP_Notify::flags.pre_arm_check) {
-        return sequence_prearm_failing;
+    //shielded by zhangyong 20190919
+    //    return sequence_prearm_failing;
+        switch(AP_Notify::flags.flight_mode)
+        {
+            case STABILIZE:
+            {
+                return sequence_prearm_failing_stabilize;
+            }
+            case ALT_HOLD:
+            case POSHOLD:
+            {
+                return sequence_prearm_failing_althold;
+            }
+            case LOITER:
+            {
+                return sequence_prearm_failing_loiter;
+            }
+            default:
+            {
+                if (AP_Notify::flags.gps_status >= AP_GPS::GPS_OK_FIX_3D) 
+				{
+                    return sequence_prearm_failing_default;
+        		}
+				else
+				{
+            		// solid blue if armed with no GPS lock
+            		return sequence_prearm_failing_default_nogps;
+        		}
+            }
+        }
+
     }
     if (AP_Notify::flags.gps_status >= AP_GPS::GPS_OK_FIX_3D_DGPS && AP_Notify::flags.pre_arm_gps_check) {
-        return sequence_disarmed_good_dgps;
+        // modified by zhangyong 20190919
+        //return sequence_disarmed_good_dgps;
+        //  modified end
+        switch(AP_Notify::flags.flight_mode)
+        {
+            case STABILIZE:
+            {
+                return sequence_disarmed_good_dgps_stabilize;
+            }
+            case ALT_HOLD:
+            case POSHOLD:
+            {
+                return sequence_disarmed_good_dgps_althold;
+            }
+            case LOITER:
+            {
+                return sequence_disarmed_good_dgps_loiter;
+            }
+            default:
+            {
+                return sequence_disarmed_good_dgps_default;
+            }
+        }
     }
 
     if (AP_Notify::flags.gps_status >= AP_GPS::GPS_OK_FIX_3D && AP_Notify::flags.pre_arm_gps_check) {
-        return sequence_disarmed_good_gps;
+        // modified by zhangyong 20190919
+        //return sequence_disarmed_good_gps;
+        // modified end
+        switch(AP_Notify::flags.flight_mode)
+        {
+            case STABILIZE:
+            {
+                return sequence_disarmed_good_gps_stabilize;
+            }
+            case ALT_HOLD:
+            case POSHOLD:
+            {
+                return sequence_disarmed_good_gps_althold;
+            }
+            case LOITER:
+            {
+                return sequence_disarmed_good_gps_loiter;
+            }
+            default:
+            {
+                return sequence_disarmed_good_gps_default;
+            }
+        }
     }
 
-    return sequence_disarmed_bad_gps;
+    // modified by zhangyong 20190919
+    //return sequence_disarmed_bad_gps;
+    // modified end
+    switch(AP_Notify::flags.flight_mode)
+    {
+        case STABILIZE:
+        {
+            return sequence_disarmed_bad_gps_stabilize;
+        }
+        case ALT_HOLD:
+        case POSHOLD:
+        {
+            return sequence_disarmed_bad_gps_althold;
+        }
+        case LOITER:
+        {
+           return sequence_disarmed_bad_gps_loiter;
+        }
+        default:
+        {
+            return sequence_disarmed_bad_gps_default_nogps;
+        }
+    }
 }
 
 // update - updates led according to timed_updated.  Should be called

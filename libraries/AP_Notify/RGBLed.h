@@ -81,6 +81,8 @@ private:
     DEFINE_COLOUR_SEQUENCE(colour,colour,colour,colour,colour,colour,colour,colour,colour,colour)
 #define DEFINE_COLOUR_SEQUENCE_ALTERNATE(colour1, colour2)                      \
     DEFINE_COLOUR_SEQUENCE(colour1,colour2,colour1,colour2,colour1,colour2,colour1,colour2,colour1,colour2)
+#define DEFINE_COLOUR_SEQUENCE_ALTERNATE_SLOW(colour1, colour2)                      \
+    DEFINE_COLOUR_SEQUENCE(colour1,colour1,colour1,colour1,colour1,colour2,colour2,colour2,colour2,colour2)    
 
 #define OFF    0
 #define BLUE   1
@@ -88,6 +90,8 @@ private:
 #define RED    4
 #define YELLOW (RED|GREEN)
 #define WHITE (RED|GREEN|BLUE)
+#define PURPLE (RED|BLUE)
+
 
     const uint32_t sequence_initialising = DEFINE_COLOUR_SEQUENCE_ALTERNATE(RED,BLUE);
     const uint32_t sequence_trim_or_esc = DEFINE_COLOUR_SEQUENCE(RED,BLUE,GREEN,RED,BLUE,GREEN,RED,BLUE,GREEN,OFF);
@@ -102,6 +106,33 @@ private:
     const uint32_t sequence_disarmed_good_dgps = DEFINE_COLOUR_SEQUENCE_ALTERNATE(GREEN,OFF);
     const uint32_t sequence_disarmed_good_gps = DEFINE_COLOUR_SEQUENCE_SLOW(GREEN);
     const uint32_t sequence_disarmed_bad_gps = DEFINE_COLOUR_SEQUENCE_SLOW(BLUE);
+
+    const uint32_t sequence_armed_stabilize = DEFINE_COLOUR_SEQUENCE_SOLID(PURPLE);
+    const uint32_t sequence_armed_althold = DEFINE_COLOUR_SEQUENCE_SOLID(WHITE);
+    const uint32_t sequence_armed_loiter = sequence_armed;
+    const uint32_t sequence_armed_default = sequence_armed_loiter;
+    const uint32_t sequence_armed_default_nogps = sequence_armed_nogps;
+
+    const uint32_t sequence_prearm_failing_stabilize = DEFINE_COLOUR_SEQUENCE(YELLOW,YELLOW,PURPLE,PURPLE,YELLOW,YELLOW,PURPLE,PURPLE,PURPLE,PURPLE);
+    const uint32_t sequence_prearm_failing_althold = DEFINE_COLOUR_SEQUENCE(YELLOW,YELLOW,WHITE,WHITE,YELLOW,YELLOW,WHITE,WHITE,WHITE,WHITE);
+    const uint32_t sequence_prearm_failing_loiter = DEFINE_COLOUR_SEQUENCE(YELLOW,YELLOW,GREEN,GREEN,YELLOW,YELLOW,GREEN,GREEN,GREEN,GREEN);
+    const uint32_t sequence_prearm_failing_default = sequence_prearm_failing_loiter;
+    const uint32_t sequence_prearm_failing_default_nogps = sequence_prearm_failing_stabilize;
+
+    const uint32_t sequence_disarmed_good_dgps_stabilize = DEFINE_COLOUR_SEQUENCE_ALTERNATE(PURPLE, GREEN);
+    const uint32_t sequence_disarmed_good_dgps_althold = DEFINE_COLOUR_SEQUENCE_ALTERNATE(WHITE, GREEN);
+    const uint32_t sequence_disarmed_good_dgps_loiter = sequence_disarmed_good_dgps;
+    const uint32_t sequence_disarmed_good_dgps_default = sequence_disarmed_good_dgps_loiter;
+
+    const uint32_t sequence_disarmed_good_gps_stabilize = DEFINE_COLOUR_SEQUENCE_ALTERNATE_SLOW(PURPLE, GREEN);
+    const uint32_t sequence_disarmed_good_gps_althold = DEFINE_COLOUR_SEQUENCE_ALTERNATE_SLOW(WHITE, GREEN);
+    const uint32_t sequence_disarmed_good_gps_loiter = sequence_disarmed_good_gps;
+    const uint32_t sequence_disarmed_good_gps_default = sequence_disarmed_good_gps_loiter;
+
+    const uint32_t sequence_disarmed_bad_gps_stabilize = DEFINE_COLOUR_SEQUENCE_ALTERNATE_SLOW(PURPLE, BLUE);
+    const uint32_t sequence_disarmed_bad_gps_althold = DEFINE_COLOUR_SEQUENCE_ALTERNATE_SLOW(WHITE, BLUE);
+    const uint32_t sequence_disarmed_bad_gps_loiter = sequence_disarmed_good_gps;
+    const uint32_t sequence_disarmed_bad_gps_default_nogps = sequence_armed_nogps;
 
     uint8_t last_step;
     enum rgb_source_t {
