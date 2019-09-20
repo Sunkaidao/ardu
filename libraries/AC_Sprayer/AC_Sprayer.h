@@ -60,7 +60,7 @@ public:
     /// update - adjusts servo positions based on speed and requested quantity
     void update();
 
-	int16_t get_unspray_dist() { return _unspray_dist.get();}
+	int16_t get_unspray_dist() { return (_unspray_dist.get()-50);}
 
     static const struct AP_Param::GroupInfo var_info[];
 

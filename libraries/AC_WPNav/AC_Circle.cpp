@@ -113,7 +113,7 @@ void AC_Circle::init_smooth(const Vector3f& center)
     _center = center;
 
     const Vector3f& vel_target = _pos_control.get_vel_target();
-	_speed_xy = safe_sqrt(sq(vel_target.x)+sq(vel_target.y));
+	_speed_xy = MAX(50,safe_sqrt(sq(vel_target.x)+sq(vel_target.y)));
 	
     // initialise position controller (sets target roll angle, pitch angle and I terms based on vehicle current lean angles)
     _pos_control.set_desired_accel_xy(0.0f,0.0f);

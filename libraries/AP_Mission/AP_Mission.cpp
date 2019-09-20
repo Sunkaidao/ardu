@@ -423,6 +423,13 @@ bool AP_Mission::is_nav_cmd(const Mission_Command& cmd)
     return (cmd.id <= MAV_CMD_NAV_LAST || cmd.id == MAV_CMD_NAV_SET_YAW_SPEED);
 }
 
+/// is_nav_cmd - returns true if the command's id is a "navigation" command, false if "do" or "conditional" command
+bool AP_Mission::is_nav_circle_cmd(const Mission_Command& cmd)
+{
+    // NAV commands all have ids below MAV_CMD_NAV_LAST except NAV_SET_YAW_SPEED
+    return cmd.id == MAV_CMD_NAV_CIRCLE_LOOSE;
+}
+
 /// get_next_nav_cmd - gets next "navigation" command found at or after start_index
 ///     returns true if found, false if not found (i.e. reached end of mission command list)
 ///     accounts for do_jump commands but never increments the jump's num_times_run (advance_current_nav_cmd is responsible for this)
@@ -531,9 +538,17 @@ bool AP_Mission::set_current_cmd(uint16_t index)
 
             // check if navigation or "do" command
             if (is_nav_cmd(cmd)) {
-                // set current navigation command
-                _nav_cmd = cmd;
-                _flags.nav_cmd_loaded = true;
+				if (!is_nav_circle_cmd(cmd)) {
+                    // set current navigation command
+                    _nav_cmd = cmd;
+                    _flags.nav_cmd_loaded = true;
+				}else {
+                    // set current navigation command
+                    cmd.id = MAV_CMD_NAV_WAYPOINT;
+					cmd.p1 = 1;
+                    _nav_cmd = cmd;
+                    _flags.nav_cmd_loaded = true;                   
+			    }
             }else{
                 // set current do command
                 if (!_flags.do_cmd_loaded) {
@@ -1637,18 +1652,35 @@ bool AP_Mission::advance_current_nav_cmd(uint16_t starting_index)
 
         // check if navigation or "do" command
         if (is_nav_cmd(cmd)) {
-            // save previous nav command index
-            _prev_nav_cmd_id = _nav_cmd.id;
-            _prev_nav_cmd_index = _nav_cmd.index;
-            // save separate previous nav command index if it contains lat,long,alt
-            if (!(cmd.content.location.lat == 0 && cmd.content.location.lng == 0)) {
-                _prev_nav_cmd_wp_index = _nav_cmd.index;
-            }
-            // set current navigation command and start it
-            _nav_cmd = cmd;
-            if (start_command(_nav_cmd)) {
-                _flags.nav_cmd_loaded = true;
-            }
+			if (starting_index == 0) {
+                // save previous nav command index
+                _prev_nav_cmd_id = _nav_cmd.id;
+                _prev_nav_cmd_index = _nav_cmd.index;
+                // save separate previous nav command index if it contains lat,long,alt
+                if (!(cmd.content.location.lat == 0 && cmd.content.location.lng == 0)) {
+                    _prev_nav_cmd_wp_index = _nav_cmd.index;
+                }
+                // set current navigation command and start it
+                _nav_cmd = cmd;
+                if (start_command(_nav_cmd)) {
+                    _flags.nav_cmd_loaded = true;
+                }
+			} else {
+                // save previous nav command index
+                _prev_nav_cmd_id = _nav_cmd.id;
+                _prev_nav_cmd_index = _nav_cmd.index;
+                // save separate previous nav command index if it contains lat,long,alt
+                if (!(cmd.content.location.lat == 0 && cmd.content.location.lng == 0)) {
+                    _prev_nav_cmd_wp_index = _nav_cmd.index;
+                }
+                // set current navigation command and start it
+                cmd.id = MAV_CMD_NAV_WAYPOINT;
+				cmd.p1 = 1;
+                _nav_cmd = cmd;
+                if (start_command(_nav_cmd)) {
+                    _flags.nav_cmd_loaded = true;
+                }
+			}
         }else{
             // set current do command and start it (if not already set)
             if (!_flags.do_cmd_loaded) {
@@ -2076,7 +2108,11 @@ const char *AP_Mission::Mission_Command::type() const {
         return "PayloadPlace";
     case MAV_CMD_DO_PARACHUTE:
         return "Parachute";
-
+    case MAV_CMD_DO_SPRAYER:
+        return "DoSprayer";
+    case MAV_CMD_NAV_CIRCLE_LOOSE:   // MAV ID: 29
+        return "CircleLoose";
+		
     default:
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
         AP_HAL::panic("Mission command with ID %u has no string", id);
@@ -2107,6 +2143,7 @@ bool AP_Mission::record_breakpoint()
     if (!AP::ahrs().get_position(current_loc) || \
 		_nav_cmd.id == MAV_CMD_NAV_TAKEOFF || \
 		_nav_cmd.id == MAV_CMD_NAV_RETURN_TO_LAUNCH || \
+        (_nav_cmd.id == MAV_CMD_NAV_CIRCLE_LOOSE && (_nav_cmd.p1 & 0x0001)) || \
 		_nav_cmd.index == _first_nav_cmd_index)
     {
         goto record_breakpoint_false;
@@ -2194,7 +2231,8 @@ int8_t AP_Mission::regenerate_airline()
             break;
         }
 
-        if (cmd_cam_tigg_dist.id == MAV_CMD_NAV_WAYPOINT)
+        if (cmd_cam_tigg_dist.id == MAV_CMD_NAV_WAYPOINT || \
+			cmd_cam_tigg_dist.id == MAV_CMD_NAV_CIRCLE_LOOSE)
         {
             break;
         }
@@ -2221,7 +2259,8 @@ int8_t AP_Mission::regenerate_airline()
 			return -5;
 		}
 
-		if (cmd.id == MAV_CMD_NAV_WAYPOINT)
+		if (cmd.id == MAV_CMD_NAV_WAYPOINT || \
+			cmd.id == MAV_CMD_NAV_CIRCLE_LOOSE)
 		{
 			cmd_b = cmd;
 		}
@@ -2239,7 +2278,8 @@ int8_t AP_Mission::regenerate_airline()
 			return -5;
 		}
 
-		if (cmd.id == MAV_CMD_NAV_WAYPOINT)
+		if (cmd.id == MAV_CMD_NAV_WAYPOINT || \
+			cmd.id == MAV_CMD_NAV_CIRCLE_LOOSE)
 		{
 			cmd_pre = cmd;
 			break;
@@ -2275,6 +2315,8 @@ int8_t AP_Mission::regenerate_airline()
 
     Location breakpoint_online = get_breakpoint_online(cmd_pre.content.location,cmd_b.content.location);
     cmd_b.index = _breakpoint.index + offset;
+	cmd_b.id = MAV_CMD_NAV_WAYPOINT;
+	cmd_b.p1 = 1;
 	
     if (breakpoint_online.lat == 0 && breakpoint_online.lng == 0)
     {

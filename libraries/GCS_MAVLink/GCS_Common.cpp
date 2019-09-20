@@ -442,8 +442,6 @@ void GCS_MAVLINK::handle_mission_request_list(const mavlink_message_t &msg)
 
 	//gcs().send_text(MAV_SEVERITY_WARNING, "type %d", packet.mission_type);
 
-	//	shielded by zhangyong 20190820, need modify by duqiang
-	packet.mission_type = 0;
     MissionItemProtocol *prot = gcs().get_prot_for_mission_type((MAV_MISSION_TYPE)packet.mission_type);
     if (prot == nullptr) {
         mavlink_msg_mission_ack_send(chan,

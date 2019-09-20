@@ -415,6 +415,7 @@ private:
 #endif
     void do_payload_place(const AP_Mission::Mission_Command& cmd);
     void do_RTL(void);
+    void do_circle_or_nav_wp_smooth(const AP_Mission::Mission_Command& cmd);
 
     bool verify_takeoff();
     bool verify_land();

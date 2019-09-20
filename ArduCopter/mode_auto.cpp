@@ -451,56 +451,7 @@ bool ModeAuto::start_command(const AP_Mission::Mission_Command& cmd)
         break;
 	
 	case MAV_CMD_NAV_CIRCLE_LOOSE:                 // 29  Navigate to Waypoint
-	    if (cmd.p1 & 0x0001)
-	    {
-	        float radius_cm = 0;
-	        AP_Mission::Mission_Command circle_center;
-	        AP_Mission::Mission_Command cmd1;
-            AP_Mission::Mission_Command cmd2 = mission.get_current_nav_cmd();
-			mission.get_next_nav_cmd(mission.get_prev_nav_cmd_index(), cmd1);
-
-			Vector3f dest1_neu;
-			Vector3f dest2_neu;
-			
-			if (!cmd1.content.location.get_vector_from_origin_NEU(dest1_neu) ||
-			    !cmd2.content.location.get_vector_from_origin_NEU(dest2_neu)) {
-                break;
-			}
-
-            radius_cm = (dest1_neu - dest2_neu).length()/2.0f;
-			
-			Vector3f cen_ned = (dest1_neu + dest2_neu) / 2;
-			
-			Location temp(cen_ned);
-			circle_center.id = MAV_CMD_NAV_LOITER_TURNS;
-	        circle_center.content.location = temp;		
-		
-     		circle_center.content.location.loiter_ccw = (cmd.p1 & 0x0002) >> 1;
-
-
-            cmd1 = cmd2;
-			mission.get_next_nav_cmd(mission.get_current_nav_index() + 1, cmd2);
-
-			if (!cmd1.content.location.get_vector_from_origin_NEU(dest1_neu) ||
-			    !cmd2.content.location.get_vector_from_origin_NEU(dest2_neu)) {
-                break;
-			}
-
-			pos_delta_unit = dest2_neu - dest1_neu;
-			pos_delta_unit.z = 0;
-			
-			pos_delta_unit.normalize();
-			
-			circle_center.p1 = radius_cm;
-			do_circle_loose(circle_center);
-	    }
-		else
-		{
-		    AP_Mission::Mission_Command cmd_tmp = cmd;
-			cmd_tmp.id = MAV_CMD_NAV_SPLINE_WAYPOINT;
-			
-		    do_nav_wp_smooth(cmd_tmp);
-		}
+	    do_circle_or_nav_wp_smooth(cmd);
         break;
 
     case MAV_CMD_NAV_SPLINE_WAYPOINT:           // 82  Navigate to Waypoint using spline
@@ -1248,7 +1199,6 @@ void ModeAuto::do_nav_wp(const AP_Mission::Mission_Command& cmd)
 // do_nav_wp_smooth - initiate move to next waypoint
 void ModeAuto::do_nav_wp_smooth(const AP_Mission::Mission_Command& cmd)
 {
-    _mode = Auto_ZigZagAb;
     copter.mode_zigzag_ab.do_nav_wp_smooth(cmd);
 }
 
@@ -1324,7 +1274,6 @@ void ModeAuto::do_circle(const AP_Mission::Mission_Command& cmd)
 // do_circle_loose - initiate moving in a circle
 void ModeAuto::do_circle_loose(const AP_Mission::Mission_Command& cmd)
 {
-    _mode = Auto_ZigZagAb;
     copter.mode_zigzag_ab.do_circle(cmd);
 }
 
@@ -1595,6 +1544,61 @@ void ModeAuto::do_RTL(void)
 {
     // start rtl in auto flight mode
     rtl_start();
+}
+
+void ModeAuto::do_circle_or_nav_wp_smooth(const AP_Mission::Mission_Command& cmd)
+{
+    _mode = Auto_ZigZagAb;
+	
+	if (cmd.p1 & 0x0001)
+	{
+		float radius_cm = 0;
+		AP_Mission::Mission_Command circle_center;
+		AP_Mission::Mission_Command cmd1;
+		AP_Mission::Mission_Command cmd2 = mission.get_current_nav_cmd();
+		mission.get_next_nav_cmd(mission.get_prev_nav_cmd_index(), cmd1);
+	
+		Vector3f dest1_neu;
+		Vector3f dest2_neu;
+				
+		if (!cmd1.content.location.get_vector_from_origin_NEU(dest1_neu) ||
+			!cmd2.content.location.get_vector_from_origin_NEU(dest2_neu)) {
+			return;
+		}
+	
+		radius_cm = (dest1_neu - dest2_neu).length()/2.0f;
+				
+		Vector3f cen_ned = (dest1_neu + dest2_neu) / 2;
+				
+		Location temp(cen_ned);
+		circle_center.id = MAV_CMD_NAV_LOITER_TURNS;
+		circle_center.content.location = temp;		
+			
+		circle_center.content.location.loiter_ccw = (cmd.p1 & 0x0002) >> 1;
+	
+	
+		cmd1 = cmd2;
+		mission.get_next_nav_cmd(mission.get_current_nav_index() + 1, cmd2);
+	
+		if (!cmd1.content.location.get_vector_from_origin_NEU(dest1_neu) ||
+			!cmd2.content.location.get_vector_from_origin_NEU(dest2_neu)) {
+			return;
+		}
+	
+		pos_delta_unit = dest2_neu - dest1_neu;
+		pos_delta_unit.z = 0;
+			
+		pos_delta_unit.normalize();
+				
+		circle_center.p1 = radius_cm;
+		do_circle_loose(circle_center);
+	}
+	else
+	{
+	    AP_Mission::Mission_Command cmd_tmp = cmd;
+	    cmd_tmp.p1 = AP::sprayer()->get_unspray_dist();
+		do_nav_wp_smooth(cmd_tmp);
+	}
 }
 
 /********************************************************************************/
@@ -2034,8 +2038,9 @@ bool ModeAuto::verify_circle_loose(const AP_Mission::Mission_Command& cmd)
 	
 	float curr_spd_pos_angle = ToDeg(wrap_PI(curr_spd_rad - curr_pos_rad));
 	bool pass_spd = ((cmd.p1 >> 1) & 0x0001) == true ? curr_spd_pos_angle < speed_angle : curr_spd_pos_angle > -speed_angle;
+    bool pass_angle = copter.circle_nav->get_angle_total()/M_2PI*360 >= (float)turn_angle;
 
-	return (copter.circle_nav->get_angle_total()/M_2PI*360 >= (float)turn_angle) && pass_spd;
+	return pass_angle && pass_spd;
 }
 
 
