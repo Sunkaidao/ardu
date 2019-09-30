@@ -823,8 +823,14 @@ bool ModeZigZagAB::verify_circle(const AP_Mission::Mission_Command& cmd)
         return false;
     }
 
+	bool res = mission.reached_circle_angale();
+    if (res) {
+        pos_control->set_desired_velocity_xy(0, 0);
+	    pos_control->set_desired_accel_xy(0, 0);
+	}
+		
     // check if we have completed circling
-    return mission.reached_circle_angale();
+    return res;
 }
 
 // verify_spline_wp - check if we have reached the next way point using spline
@@ -834,14 +840,20 @@ bool ModeZigZagAB::verify_spline_wp(const AP_Mission::Mission_Command& cmd)
     if ( !copter.wp_nav->reached_wp_destination() ) {
         return false;
     }
-
+/*
     // check if timer has run out
     if (copter.wp_nav->get_wp_distance_to_destination() < 50) {
 		AP_Notify::events.waypoint_complete = 1;
-        //gcs().send_text(MAV_SEVERITY_INFO, "Reached command #%i",cmd.index);
+        pos_control->set_desired_velocity_xy(0, 0);
+	    pos_control->set_desired_accel_xy(0, 0);
         return true;
     }
-    return false;
+*/
+	Vector3f pos_delta_unit = copter.wp_nav->get_pos_delta_unit();
+	Vector3f des2curr =  inertial_nav.get_position() - copter.wp_nav->get_wp_destination();
+
+    float len = des2curr*pos_delta_unit;
+	return len > 0 ? true : false;
 }
 
 void ModeZigZagAB::abmode_switch_nav_mode()

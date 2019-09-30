@@ -281,6 +281,12 @@ public:
     ///     throttle targets will be sent directly to the motors
     void update_vel_controller_xy();
 
+    /// update_velocity_controller_xy - run the XY velocity controller - should be called at 100hz or higher
+    ///     velocity targets should we set using set_desired_velocity_xy() method
+    ///     callers should use get_roll() and get_pitch() methods and sent to the attitude controller
+    ///     throttle targets will be sent directly to the motors
+    void update_vel_controller_xy_smooth();
+
     /// update_velocity_controller_xyz - run the velocity controller - should be called at 100hz or higher
     ///     velocity targets should we set using set_desired_velocity_xyz() method
     ///     callers should use get_roll() and get_pitch() methods and sent to the attitude controller

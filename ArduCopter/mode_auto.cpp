@@ -664,7 +664,8 @@ bool ModeAuto::verify_command(const AP_Mission::Mission_Command& cmd)
         break;
 	
     case MAV_CMD_NAV_CIRCLE_LOOSE:
-        return verify_zigzag_ab(cmd);
+        cmd_complete = verify_zigzag_ab(cmd);
+		break;
 		
     case MAV_CMD_NAV_LAND:
         cmd_complete = verify_land();
@@ -1177,6 +1178,7 @@ void ModeAuto::do_nav_wp(const AP_Mission::Mission_Command& cmd)
             case MAV_CMD_NAV_LOITER_TIME:
             case MAV_CMD_NAV_LAND:
             case MAV_CMD_NAV_SPLINE_WAYPOINT:
+            case MAV_CMD_NAV_CIRCLE_LOOSE:
                 // if next command's lat, lon is specified then do not slowdown at this waypoint
                 if ((temp_cmd.content.location.lat != 0) || (temp_cmd.content.location.lng != 0)) {
                     fast_waypoint = true;
@@ -2014,6 +2016,11 @@ bool ModeAuto::verify_zigzag_ab(const AP_Mission::Mission_Command& cmd)
 		res = copter.mode_zigzag_ab.verify_spline_wp(cmd);
 	}else if ((cmd.p1 & 0x0001) && cmd.id == MAV_CMD_NAV_CIRCLE_LOOSE){
 		res = verify_circle_loose(cmd);
+	}
+
+	if (res) {
+        pos_control->set_desired_velocity_xy(0, 0);
+	    pos_control->set_desired_accel_xy(0, 0);
 	}
 	
     return res;

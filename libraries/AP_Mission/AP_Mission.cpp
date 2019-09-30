@@ -228,7 +228,7 @@ void AP_Mission::reset()
     if (_breakpoint.index != 0 && _breakpoint.index < _cmd_total)
     {
         _nav_cmd.index = _breakpoint.index;
-		_flags.nav_cmd_loaded   = true;
+        _flags.nav_cmd_loaded = true;
     }
     //added end
 }
@@ -2139,11 +2139,12 @@ bool AP_Mission::contains_item(MAV_CMD command) const
 bool AP_Mission::record_breakpoint()
 {
     struct Location current_loc;
+	Mission_Command cmd_pre;
 	
     if (!AP::ahrs().get_position(current_loc) || \
 		_nav_cmd.id == MAV_CMD_NAV_TAKEOFF || \
 		_nav_cmd.id == MAV_CMD_NAV_RETURN_TO_LAUNCH || \
-        (_nav_cmd.id == MAV_CMD_NAV_CIRCLE_LOOSE && (_nav_cmd.p1 & 0x0001)) || \
+		(_nav_cmd.id == MAV_CMD_NAV_CIRCLE_LOOSE && (_nav_cmd.p1 & 0x0001)) ||\
 		_nav_cmd.index == _first_nav_cmd_index)
     {
         goto record_breakpoint_false;
@@ -2159,6 +2160,21 @@ bool AP_Mission::record_breakpoint()
 	    _breakpoint.lat = current_loc.lat;
 	    _breakpoint.lng = current_loc.lng;
 	    _breakpoint.breakpoint_valid = true;
+
+        if (!read_cmd_from_storage(get_prev_nav_cmd_index(),cmd_pre)) {
+            goto record_breakpoint_false;
+		}
+		Location breakpoint_online = get_breakpoint_online(cmd_pre.content.location,_nav_cmd.content.location);
+
+		if (breakpoint_online.lat == 0 && breakpoint_online.lng == 0)
+        {
+            goto record_breakpoint_false;
+        }
+        else
+        {
+            _breakpoint.lat = breakpoint_online.lat;
+            _breakpoint.lng = breakpoint_online.lng;
+        }
 	}
 
 	//printf("b_index: %d,cmd_index: %d\n",_breakpoint.index,_nav_cmd.index);
@@ -2189,7 +2205,8 @@ int8_t AP_Mission::regenerate_airline()
     	return 0;
     }
 	
-    if (!_breakpoint.breakpoint_valid || _breakpoint.index == 0)
+    if (!_breakpoint.breakpoint_valid || \
+		_breakpoint.index == 0)
     {
     	return -1;
     }
@@ -2313,22 +2330,13 @@ int8_t AP_Mission::regenerate_airline()
 		}
     }
 
-    Location breakpoint_online = get_breakpoint_online(cmd_pre.content.location,cmd_b.content.location);
     cmd_b.index = _breakpoint.index + offset;
 	cmd_b.id = MAV_CMD_NAV_WAYPOINT;
 	cmd_b.p1 = 1;
 	
-    if (breakpoint_online.lat == 0 && breakpoint_online.lng == 0)
-    {
-        cmd_b.content.location.lat = _breakpoint.lat;
-        cmd_b.content.location.lng = _breakpoint.lng;
-    }
-    else
-    {
-        cmd_b.content.location.lat = breakpoint_online.lat;
-        cmd_b.content.location.lng = breakpoint_online.lng;
-    }
-    
+    cmd_b.content.location.lat = _breakpoint.lat;
+    cmd_b.content.location.lng = _breakpoint.lng;
+  
     _nav_breakpoint_cmd = cmd_b;
     _breakpoint.offset.set_and_save_ifchanged(offset);
 

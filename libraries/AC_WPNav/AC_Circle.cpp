@@ -279,8 +279,7 @@ void AC_Circle::update_smooth()
         _cir_mode = 0;
 		
         _pos_control.set_desired_velocity_xy(spd.x,spd.y);
-        //_pos_control.set_reset_desired_vel_to_pos(true);
-        _pos_control.update_xy_controller();
+        _pos_control.update_vel_controller_xy_smooth();
     }
     else
     {

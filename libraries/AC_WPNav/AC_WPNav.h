@@ -175,6 +175,8 @@ public:
     /// calculate_wp_leash_length - calculates track speed, acceleration and leash lengths for waypoint controller
     void calculate_wp_leash_length();
 
+	const Vector3f &get_pos_delta_unit() const {return _pos_delta_unit;}
+
     ///
     /// spline methods
     ///
@@ -307,6 +309,8 @@ protected:
     AP_Float    _wp_radius_cm;          // distance from a waypoint in cm that, when crossed, indicates the wp has been reached
     AP_Float    _wp_accel_cmss;          // horizontal acceleration in cm/s/s during missions
     AP_Float    _wp_accel_z_cmss;        // vertical acceleration in cm/s/s during missions
+    AP_Float    _speed_percentage;
+	AP_Float    _speed_to_pos_percentage;
 
     // waypoint controller internal variables
     uint32_t    _wp_last_update;        // time of last update_wpnav call

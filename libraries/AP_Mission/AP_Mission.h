@@ -281,7 +281,7 @@ public:
         Yaw_Command yaw;
         Change_Speed_Command speed;
         uint8_t breakpoint_valid       : 1; // true if the breakpoint is recorded
-        uint8_t send_breakpoint        : 1; // true if the breakpoint should be sended 
+        uint8_t send_breakpoint        : 1; // true if the breakpoint should be sended
     };
 
     // main program function pointers
