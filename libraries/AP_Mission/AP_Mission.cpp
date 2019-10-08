@@ -82,6 +82,7 @@ void AP_Mission::init()
     if (_breakpoint.index != 0 && _breakpoint.index < _cmd_total)
     {
     	_nav_cmd.index = _breakpoint.index-1;
+		_flags.nav_cmd_loaded = true;
     }
     ///
     
@@ -228,7 +229,7 @@ void AP_Mission::reset()
     if (_breakpoint.index != 0 && _breakpoint.index < _cmd_total)
     {
         _nav_cmd.index = _breakpoint.index;
-		_flags.nav_cmd_loaded   = true;
+        _flags.nav_cmd_loaded = true;
     }
     //added end
 }
@@ -423,6 +424,13 @@ bool AP_Mission::is_nav_cmd(const Mission_Command& cmd)
     return (cmd.id <= MAV_CMD_NAV_LAST || cmd.id == MAV_CMD_NAV_SET_YAW_SPEED);
 }
 
+/// is_nav_cmd - returns true if the command's id is a "navigation" command, false if "do" or "conditional" command
+bool AP_Mission::is_nav_circle_cmd(const Mission_Command& cmd)
+{
+    // NAV commands all have ids below MAV_CMD_NAV_LAST except NAV_SET_YAW_SPEED
+    return cmd.id == MAV_CMD_NAV_CIRCLE_LOOSE;
+}
+
 /// get_next_nav_cmd - gets next "navigation" command found at or after start_index
 ///     returns true if found, false if not found (i.e. reached end of mission command list)
 ///     accounts for do_jump commands but never increments the jump's num_times_run (advance_current_nav_cmd is responsible for this)
@@ -531,9 +539,17 @@ bool AP_Mission::set_current_cmd(uint16_t index)
 
             // check if navigation or "do" command
             if (is_nav_cmd(cmd)) {
-                // set current navigation command
-                _nav_cmd = cmd;
-                _flags.nav_cmd_loaded = true;
+				if (!is_nav_circle_cmd(cmd)) {
+                    // set current navigation command
+                    _nav_cmd = cmd;
+                    _flags.nav_cmd_loaded = true;
+				}else {
+                    // set current navigation command
+                    cmd.id = MAV_CMD_NAV_WAYPOINT;
+					cmd.p1 = 1;
+                    _nav_cmd = cmd;
+                    _flags.nav_cmd_loaded = true;                   
+			    }
             }else{
                 // set current do command
                 if (!_flags.do_cmd_loaded) {
@@ -683,6 +699,7 @@ bool AP_Mission::stored_in_location(uint16_t id)
     case MAV_CMD_NAV_VTOL_TAKEOFF:
     case MAV_CMD_NAV_VTOL_LAND:
     case MAV_CMD_NAV_PAYLOAD_PLACE:
+	case MAV_CMD_NAV_CIRCLE_LOOSE:
         return true;
     default:
         return false;
@@ -870,7 +887,27 @@ MAV_MISSION_RESULT AP_Mission::mavlink_int_to_mission_cmd(const mavlink_mission_
     case MAV_CMD_NAV_TAKEOFF:                           // MAV ID: 22
         cmd.p1 = packet.param1;                         // minimum pitch (plane only)
         break;
+	
+    case MAV_CMD_NAV_CIRCLE_LOOSE:                      // MAV ID: 29
+	{
+		/*
+		  the 15 byte limit means we can't fit both delay and radius
+		  in the cmd structure. When we expand the mission structure
+		  we can do this properly
+		 */
 
+		// acceptance radius in meters and pass by distance in meters
+		uint16_t move_mode = packet.param1;			// param 2 is acceptance radius in meters is held in low p1
+		uint16_t move_direction = packet.param2;		// param 3 is pass by distance in meters is held in high p1
+		
+		// limit to 255 so it does not wrap during the shift or mask operation
+		move_mode = move_mode & 0x0001;
+		move_direction = move_direction & 0x0001;
+		
+		cmd.p1 = (move_direction << 1) | move_mode;
+	}
+		break;
+	
     case MAV_CMD_NAV_CONTINUE_AND_CHANGE_ALT:           // MAV ID: 30
         cmd.p1 = packet.param1;                         // Climb/Descend
                         // 0 = Neutral, cmd complete at +/- 5 of indicated alt.
@@ -1052,6 +1089,12 @@ MAV_MISSION_RESULT AP_Mission::mavlink_int_to_mission_cmd(const mavlink_mission_
     case MAV_CMD_NAV_PAYLOAD_PLACE:
         cmd.p1 = packet.param1*100; // copy max-descend parameter (m->cm)
         break;
+
+    //added by ZhangYong 20170717
+    case MAV_CMD_DO_SPRAYER:
+        cmd.p1 = packet.param1; 
+        break;
+    //added end
 
     case MAV_CMD_NAV_SET_YAW_SPEED:
         cmd.content.set_yaw_speed.angle_deg = packet.param1;        // target angle in degrees
@@ -1300,7 +1343,12 @@ bool AP_Mission::mission_cmd_to_mavlink_int(const AP_Mission::Mission_Command& c
     case MAV_CMD_NAV_TAKEOFF:                           // MAV ID: 22
         packet.param1 = cmd.p1;                         // minimum pitch (plane only)
         break;
-
+	
+    case MAV_CMD_NAV_CIRCLE_LOOSE:                                            // MAV ID: 29
+        packet.param1 = cmd.p1 & 0x0001;
+		packet.param2 = (cmd.p1 & 0x0002) >> 1;
+        break;
+		
     case MAV_CMD_NAV_CONTINUE_AND_CHANGE_ALT:           // MAV ID: 30
         packet.param1 = cmd.p1;                         // Climb/Descend
                         // 0 = Neutral, cmd complete at +/- 5 of indicated alt.
@@ -1485,6 +1533,12 @@ bool AP_Mission::mission_cmd_to_mavlink_int(const AP_Mission::Mission_Command& c
         packet.param1 = cmd.p1/100.0f; // copy max-descend parameter (m->cm)
         break;
 
+    //added by ZhangYong
+    case MAV_CMD_DO_SPRAYER:
+        packet.param1 = cmd.p1;
+        break;
+    //added end
+
     case MAV_CMD_NAV_SET_YAW_SPEED:
         packet.param1 = cmd.content.set_yaw_speed.angle_deg;        // target angle in degrees
         packet.param2 = cmd.content.set_yaw_speed.speed;            // speed in meters/second
@@ -1599,18 +1653,35 @@ bool AP_Mission::advance_current_nav_cmd(uint16_t starting_index)
 
         // check if navigation or "do" command
         if (is_nav_cmd(cmd)) {
-            // save previous nav command index
-            _prev_nav_cmd_id = _nav_cmd.id;
-            _prev_nav_cmd_index = _nav_cmd.index;
-            // save separate previous nav command index if it contains lat,long,alt
-            if (!(cmd.content.location.lat == 0 && cmd.content.location.lng == 0)) {
-                _prev_nav_cmd_wp_index = _nav_cmd.index;
-            }
-            // set current navigation command and start it
-            _nav_cmd = cmd;
-            if (start_command(_nav_cmd)) {
-                _flags.nav_cmd_loaded = true;
-            }
+			if (starting_index == 0) {
+                // save previous nav command index
+                _prev_nav_cmd_id = _nav_cmd.id;
+                _prev_nav_cmd_index = _nav_cmd.index;
+                // save separate previous nav command index if it contains lat,long,alt
+                if (!(cmd.content.location.lat == 0 && cmd.content.location.lng == 0)) {
+                    _prev_nav_cmd_wp_index = _nav_cmd.index;
+                }
+                // set current navigation command and start it
+                _nav_cmd = cmd;
+                if (start_command(_nav_cmd)) {
+                    _flags.nav_cmd_loaded = true;
+                }
+			} else {
+                // save previous nav command index
+                _prev_nav_cmd_id = _nav_cmd.id;
+                _prev_nav_cmd_index = _nav_cmd.index;
+                // save separate previous nav command index if it contains lat,long,alt
+                if (!(cmd.content.location.lat == 0 && cmd.content.location.lng == 0)) {
+                    _prev_nav_cmd_wp_index = _nav_cmd.index;
+                }
+                // set current navigation command and start it
+                cmd.id = MAV_CMD_NAV_WAYPOINT;
+				cmd.p1 = 1;
+                _nav_cmd = cmd;
+                if (start_command(_nav_cmd)) {
+                    _flags.nav_cmd_loaded = true;
+                }
+			}
         }else{
             // set current do command and start it (if not already set)
             if (!_flags.do_cmd_loaded) {
@@ -2038,7 +2109,11 @@ const char *AP_Mission::Mission_Command::type() const {
         return "PayloadPlace";
     case MAV_CMD_DO_PARACHUTE:
         return "Parachute";
-
+    case MAV_CMD_DO_SPRAYER:
+        return "DoSprayer";
+    case MAV_CMD_NAV_CIRCLE_LOOSE:   // MAV ID: 29
+        return "CircleLoose";
+		
     default:
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
         AP_HAL::panic("Mission command with ID %u has no string", id);
@@ -2065,6 +2140,7 @@ bool AP_Mission::contains_item(MAV_CMD command) const
 bool AP_Mission::record_breakpoint()
 {
     struct Location current_loc;
+	Mission_Command cmd_pre;
 	
     if (!AP::ahrs().get_position(current_loc) || \
 		_nav_cmd.id == MAV_CMD_NAV_TAKEOFF || \
@@ -2084,6 +2160,27 @@ bool AP_Mission::record_breakpoint()
 	    _breakpoint.lat = current_loc.lat;
 	    _breakpoint.lng = current_loc.lng;
 	    _breakpoint.breakpoint_valid = true;
+
+        if (!read_cmd_from_storage(get_prev_nav_cmd_index(),cmd_pre)) {
+            goto record_breakpoint_false;
+		}
+		Location breakpoint_online = get_breakpoint_online(cmd_pre.content.location,_nav_cmd.content.location);
+
+		if (breakpoint_online.lat == 0 && breakpoint_online.lng == 0)
+        {
+            goto record_breakpoint_false;
+        }
+        else
+        {
+            _breakpoint.lat = breakpoint_online.lat;
+            _breakpoint.lng = breakpoint_online.lng;
+        }
+
+		if ((_nav_cmd.id == MAV_CMD_NAV_CIRCLE_LOOSE && (_nav_cmd.p1 & 0x0001))) {
+            _breakpoint.index.set_and_save_ifchanged(_nav_cmd.index==AP_MISSION_CMD_INDEX_NONE?0:_nav_cmd.index+1);
+			_breakpoint.lat = _nav_cmd.content.location.lat;
+            _breakpoint.lng = _nav_cmd.content.location.lng;
+		}
 	}
 
 	//printf("b_index: %d,cmd_index: %d\n",_breakpoint.index,_nav_cmd.index);
@@ -2114,7 +2211,8 @@ int8_t AP_Mission::regenerate_airline()
     	return 0;
     }
 	
-    if (!_breakpoint.breakpoint_valid || _breakpoint.index == 0)
+    if (!_breakpoint.breakpoint_valid || \
+		_breakpoint.index == 0)
     {
     	return -1;
     }
@@ -2156,7 +2254,8 @@ int8_t AP_Mission::regenerate_airline()
             break;
         }
 
-        if (cmd_cam_tigg_dist.id == MAV_CMD_NAV_WAYPOINT)
+        if (cmd_cam_tigg_dist.id == MAV_CMD_NAV_WAYPOINT || \
+			cmd_cam_tigg_dist.id == MAV_CMD_NAV_CIRCLE_LOOSE)
         {
             break;
         }
@@ -2183,7 +2282,8 @@ int8_t AP_Mission::regenerate_airline()
 			return -5;
 		}
 
-		if (cmd.id == MAV_CMD_NAV_WAYPOINT)
+		if (cmd.id == MAV_CMD_NAV_WAYPOINT || \
+			cmd.id == MAV_CMD_NAV_CIRCLE_LOOSE)
 		{
 			cmd_b = cmd;
 		}
@@ -2201,7 +2301,8 @@ int8_t AP_Mission::regenerate_airline()
 			return -5;
 		}
 
-		if (cmd.id == MAV_CMD_NAV_WAYPOINT)
+		if (cmd.id == MAV_CMD_NAV_WAYPOINT || \
+			cmd.id == MAV_CMD_NAV_CIRCLE_LOOSE)
 		{
 			cmd_pre = cmd;
 			break;
@@ -2235,20 +2336,13 @@ int8_t AP_Mission::regenerate_airline()
 		}
     }
 
-    Location breakpoint_online = get_breakpoint_online(cmd_pre.content.location,cmd_b.content.location);
     cmd_b.index = _breakpoint.index + offset;
+	cmd_b.id = MAV_CMD_NAV_WAYPOINT;
+	cmd_b.p1 = 1;
 	
-    if (breakpoint_online.lat == 0 && breakpoint_online.lng == 0)
-    {
-        cmd_b.content.location.lat = _breakpoint.lat;
-        cmd_b.content.location.lng = _breakpoint.lng;
-    }
-    else
-    {
-        cmd_b.content.location.lat = breakpoint_online.lat;
-        cmd_b.content.location.lng = breakpoint_online.lng;
-    }
-    
+    cmd_b.content.location.lat = _breakpoint.lat;
+    cmd_b.content.location.lng = _breakpoint.lng;
+  
     _nav_breakpoint_cmd = cmd_b;
     _breakpoint.offset.set_and_save_ifchanged(offset);
 

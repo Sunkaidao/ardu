@@ -198,6 +198,9 @@ public:
 
 		return flight_alt;
 	}
+
+	int16_t get_turn_angle() {return turn_angle.get();}
+	float get_speed_angle() {return speed_angle.get();}
 	
 	static const struct AP_Param::GroupInfo     var_info[];
 protected:

@@ -25,6 +25,8 @@
 #define AC_SPRAYER_DEFAULT_TURN_ON_DELAY    100     ///< delay between when we reach the minimum speed and we begin spraying.  This reduces the likelihood of constantly turning on/off the pump
 #define AC_SPRAYER_DEFAULT_SHUT_OFF_DELAY   1000    ///< shut-off delay in milli seconds.  This reduces the likelihood of constantly turning on/off the pump
 
+#define AC_SPRAYER_DEFAULT_UNSPRAY_DISTANCE	550
+
 /// @class  AC_Sprayer
 /// @brief  Object managing a crop sprayer comprised of a spinner and a pump both controlled by pwm
 class AC_Sprayer {
@@ -58,6 +60,8 @@ public:
     /// update - adjusts servo positions based on speed and requested quantity
     void update();
 
+	int16_t get_unspray_dist() { return (_unspray_dist.get()-50);}
+
     static const struct AP_Param::GroupInfo var_info[];
 
 private:
@@ -69,6 +73,8 @@ private:
     AP_Int16        _spinner_pwm;           ///< pwm rate of spinner
     AP_Float        _speed_min;             ///< minimum speed in cm/s above which the sprayer will be started
 
+    AP_Int16		_unspray_dist;
+	
     /// flag bitmask
     struct sprayer_flags_type {
         uint8_t spraying    : 1;            ///< 1 if we are currently spraying

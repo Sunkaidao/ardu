@@ -843,6 +843,7 @@ void AC_PosControl::init_xy_controller_smooth()
     // initialise I terms from lean angles
     _pid_vel_xy.reset_filter();
     _accel_target.zero();
+    _accel_desired.zero();
     _pid_vel_xy.set_integrator(_accel_target - _accel_desired);
 
     // flag reset required in rate to accel step
@@ -983,6 +984,39 @@ void AC_PosControl::update_vel_controller_xy()
     // update xy update time
     _last_update_xy_us = now_us;
 }
+
+/// update_velocity_controller_xy - run the velocity controller - should be called at 100hz or higher
+///     velocity targets should we set using set_desired_velocity_xy() method
+///     callers should use get_roll() and get_pitch() methods and sent to the attitude controller
+///     throttle targets will be sent directly to the motors
+void AC_PosControl::update_vel_controller_xy_smooth()
+{
+    // capture time since last iteration
+    const uint64_t now_us = AP_HAL::micros64();
+    float dt = (now_us - _last_update_xy_us) * 1.0e-6f;
+
+    // sanity check dt
+    if (dt >= 0.2f) {
+        dt = 0.0f;
+    }
+
+    // check for ekf xy position reset
+    check_for_ekf_xy_reset();
+
+    // check if xy leash needs to be recalculated
+    calc_leash_length_xy();
+
+    // apply desired velocity request to position target
+    // TODO: this will need to be removed and added to the calling function.
+    _pos_target = _inav.get_position();
+
+    // run position controller
+    run_xy_controller(dt);
+
+    // update xy update time
+    _last_update_xy_us = now_us;
+}
+
 
 /// update_velocity_controller_xyz - run the velocity controller - should be called at 100hz or higher
 ///     velocity targets should we set using set_desired_velocity_xyz() method

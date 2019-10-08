@@ -281,7 +281,7 @@ public:
         Yaw_Command yaw;
         Change_Speed_Command speed;
         uint8_t breakpoint_valid       : 1; // true if the breakpoint is recorded
-        uint8_t send_breakpoint        : 1; // true if the breakpoint should be sended 
+        uint8_t send_breakpoint        : 1; // true if the breakpoint should be sended
     };
 
     // main program function pointers
@@ -405,6 +405,8 @@ public:
 
     /// is_nav_cmd - returns true if the command's id is a "navigation" command, false if "do" or "conditional" command
     static bool is_nav_cmd(const Mission_Command& cmd);
+
+	bool is_nav_circle_cmd(const Mission_Command& cmd);
 
     /// get_current_nav_cmd - returns the current "navigation" command
     const Mission_Command& get_current_nav_cmd() const { return _nav_cmd; }

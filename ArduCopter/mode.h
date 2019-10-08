@@ -370,6 +370,7 @@ private:
     void nav_guided_run();
     void loiter_run();
     void loiter_to_alt_run();
+	void zigzag_ab_run();
 
     Location loc_from_cmd(const AP_Mission::Mission_Command& cmd) const;
 
@@ -386,9 +387,11 @@ private:
 
     void do_takeoff(const AP_Mission::Mission_Command& cmd);
     void do_nav_wp(const AP_Mission::Mission_Command& cmd);
+	void do_nav_wp_smooth(const AP_Mission::Mission_Command& cmd);
     void do_land(const AP_Mission::Mission_Command& cmd);
     void do_loiter_unlimited(const AP_Mission::Mission_Command& cmd);
     void do_circle(const AP_Mission::Mission_Command& cmd);
+	void do_circle_loose(const AP_Mission::Mission_Command& cmd);
     void do_loiter_time(const AP_Mission::Mission_Command& cmd);
     void do_loiter_to_alt(const AP_Mission::Mission_Command& cmd);
     void do_spline_wp(const AP_Mission::Mission_Command& cmd);
@@ -412,6 +415,7 @@ private:
 #endif
     void do_payload_place(const AP_Mission::Mission_Command& cmd);
     void do_RTL(void);
+    void do_circle_or_nav_wp_smooth(const AP_Mission::Mission_Command& cmd);
 
     bool verify_takeoff();
     bool verify_land();
@@ -430,6 +434,9 @@ private:
     bool verify_nav_guided_enable(const AP_Mission::Mission_Command& cmd);
 #endif
     bool verify_nav_delay(const AP_Mission::Mission_Command& cmd);
+	bool verify_zigzag_ab(const AP_Mission::Mission_Command& cmd);
+	bool verify_circle_loose(const AP_Mission::Mission_Command& cmd);
+
 
     // Loiter control
     uint16_t loiter_time_max;                // How long we should stay in Loiter Mode for mission scripting (time in seconds)
@@ -463,6 +470,8 @@ private:
         float descend_start_altitude;
         float descend_max; // centimetres
     } nav_payload_place;
+
+	Vector3f pos_delta_unit;
 };
 
 #if AUTOTUNE_ENABLED == ENABLED
@@ -1321,6 +1330,11 @@ public:
     void circle_movetoedge_start(const Location &circle_center, float radius_m);
     void circle_start();
 	void spline_start_smooth(const Location& dest_loc,float width);
+	
+	void do_nav_wp_smooth(const AP_Mission::Mission_Command& cmd);
+	void do_circle(const AP_Mission::Mission_Command& cmd);
+
+	bool verify_spline_wp(const AP_Mission::Mission_Command& cmd);
 
     AP_ABMission mission{
         FUNCTOR_BIND_MEMBER(&ModeZigZagAB::start_command, bool, const AP_Mission::Mission_Command &),
@@ -1357,9 +1371,7 @@ private:
     Location terrain_adjusted_location(const AP_Mission::Mission_Command& cmd) const;
 
     void do_nav_wp(const AP_Mission::Mission_Command& cmd);
-	void do_nav_wp_smooth(const AP_Mission::Mission_Command& cmd);
     void do_loiter_unlimited(const AP_Mission::Mission_Command& cmd);
-    void do_circle(const AP_Mission::Mission_Command& cmd);
     void do_loiter_time(const AP_Mission::Mission_Command& cmd);
     void do_loiter_to_alt(const AP_Mission::Mission_Command& cmd);
     void do_spline_wp(const AP_Mission::Mission_Command& cmd);
@@ -1371,7 +1383,6 @@ private:
     bool verify_yaw();
     bool verify_nav_wp(const AP_Mission::Mission_Command& cmd);
     bool verify_circle(const AP_Mission::Mission_Command& cmd);
-    bool verify_spline_wp(const AP_Mission::Mission_Command& cmd);
 
 	void abmode_switch_nav_mode();
 

@@ -67,6 +67,20 @@ const AP_Param::GroupInfo AC_WPNav::var_info[] = {
     // @User: Advanced
     AP_GROUPINFO("RFND_USE",   10, AC_WPNav, _rangefinder_use, 1),
 
+	// @Param: RFND_USE
+    // @DisplayName: Waypoint missions use rangefinder for terrain following
+    // @Description: This controls if waypoint missions use rangefinder for terrain following
+    // @Values: 0:Disable,1:Enable
+    // @User: Advanced
+    AP_GROUPINFO("SPD_PER",   11, AC_WPNav, _speed_percentage, 0.5),
+
+	// @Param: RFND_USE
+    // @DisplayName: Waypoint missions use rangefinder for terrain following
+    // @Description: This controls if waypoint missions use rangefinder for terrain following
+    // @Values: 0:Disable,1:Enable
+    // @User: Advanced
+    AP_GROUPINFO("VP_PER",   12, AC_WPNav, _speed_to_pos_percentage, 0.5),
+
     AP_GROUPEND
 };
 
@@ -236,7 +250,9 @@ bool AC_WPNav::set_wp_destination(const Vector3f& destination, bool terrain_alt)
 bool AC_WPNav::set_wp_destination_smooth(const Vector3f& destination, bool terrain_alt, float width)
 {
 	Vector3f origin;
-	_smoothing_speed = MIN(_pos_control.get_max_speed_xy(), safe_sqrt(0.5*_pos_control.get_max_accel_xy()*width));
+    float speed_percentage = constrain_float(_speed_percentage, 0, 1.0f);
+
+	_smoothing_speed = MIN(_pos_control.get_max_speed_xy(), speed_percentage*safe_sqrt(0.5*_pos_control.get_max_accel_xy()*width));
 
     // if waypoint controller is active use the existing position target as the origin
     if ((AP_HAL::millis() - _wp_last_update) < 1000) {
@@ -355,6 +371,15 @@ bool AC_WPNav::set_wp_origin_and_destination_smooth(const Vector3f& origin, cons
     }else{
         _pos_delta_unit = pos_delta/_track_length;
     }
+
+    if (!is_zero(_speed_to_pos_percentage.get())) {
+        _origin = _origin + (_pos_delta_unit * _inav.get_speed_xy()*_speed_to_pos_percentage);
+	
+	    pos_delta = _destination - _origin + Vector3f(0,0,is_zero(throttle_alt_offset) ? 0 : _origin.z - _destination.z);
+        _track_length = pos_delta.length(); // get track length
+        _track_length_xy = safe_sqrt(sq(pos_delta.x)+sq(pos_delta.y));  // get horizontal track length (used to decide if we should update yaw)
+	}
+	
 
     // get origin's alt-above-terrain
     float origin_terr_offset = 0.0f;
@@ -744,7 +769,12 @@ bool AC_WPNav::advance_wp_target_along_track_rf(float dt)
             _pos_control.set_xy_target(final_target.x, final_target.y);
 	    }
 	}
-	
+
+/*
+    if (track_covered >= _wp_radius_cm) {
+	    _pos_control.set_desired_velocity_xy(-track_error.x, -track_error.y);
+    }
+*/
     // check if we've reached the waypoint
     if( !_flags.reached_destination ) {
         if( _track_desired >= _track_length ) {
