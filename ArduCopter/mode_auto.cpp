@@ -1580,16 +1580,26 @@ void ModeAuto::do_circle_or_nav_wp_smooth(const AP_Mission::Mission_Command& cmd
 	
 	
 		cmd1 = cmd2;
-		mission.get_next_nav_cmd(mission.get_current_nav_index() + 1, cmd2);
+
+		for(uint16_t i = 1; i<30 ; i++)
+		{
+		    mission.get_next_nav_cmd(mission.get_current_nav_index() + i, cmd2);
 	
-		if (!cmd1.content.location.get_vector_from_origin_NEU(dest1_neu) ||
-			!cmd2.content.location.get_vector_from_origin_NEU(dest2_neu)) {
-			return;
+		    if (!cmd1.content.location.get_vector_from_origin_NEU(dest1_neu) ||
+			    !cmd2.content.location.get_vector_from_origin_NEU(dest2_neu)) {
+			    break;
+		    }
+
+			if (!is_equal(dest1_neu.x,dest2_neu.x) || \
+			    !is_equal(dest1_neu.y,dest2_neu.y))
+            {
+                break;
+            }
 		}
-	
+
 		pos_delta_unit = dest2_neu - dest1_neu;
 		pos_delta_unit.z = 0;
-			
+
 		pos_delta_unit.normalize();
 				
 		circle_center.p1 = radius_cm;

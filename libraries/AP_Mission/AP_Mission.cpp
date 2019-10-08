@@ -82,6 +82,7 @@ void AP_Mission::init()
     if (_breakpoint.index != 0 && _breakpoint.index < _cmd_total)
     {
     	_nav_cmd.index = _breakpoint.index-1;
+		_flags.nav_cmd_loaded = true;
     }
     ///
     
@@ -2144,7 +2145,6 @@ bool AP_Mission::record_breakpoint()
     if (!AP::ahrs().get_position(current_loc) || \
 		_nav_cmd.id == MAV_CMD_NAV_TAKEOFF || \
 		_nav_cmd.id == MAV_CMD_NAV_RETURN_TO_LAUNCH || \
-		(_nav_cmd.id == MAV_CMD_NAV_CIRCLE_LOOSE && (_nav_cmd.p1 & 0x0001)) ||\
 		_nav_cmd.index == _first_nav_cmd_index)
     {
         goto record_breakpoint_false;
@@ -2175,6 +2175,12 @@ bool AP_Mission::record_breakpoint()
             _breakpoint.lat = breakpoint_online.lat;
             _breakpoint.lng = breakpoint_online.lng;
         }
+
+		if ((_nav_cmd.id == MAV_CMD_NAV_CIRCLE_LOOSE && (_nav_cmd.p1 & 0x0001))) {
+            _breakpoint.index.set_and_save_ifchanged(_nav_cmd.index==AP_MISSION_CMD_INDEX_NONE?0:_nav_cmd.index+1);
+			_breakpoint.lat = _nav_cmd.content.location.lat;
+            _breakpoint.lng = _nav_cmd.content.location.lng;
+		}
 	}
 
 	//printf("b_index: %d,cmd_index: %d\n",_breakpoint.index,_nav_cmd.index);
