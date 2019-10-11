@@ -126,3 +126,5 @@ struct current_gps_week_ms
 };
 
 #endif
+
+#define SPRAYER_ENABLED       ENABLED
