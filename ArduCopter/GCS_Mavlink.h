@@ -50,6 +50,7 @@ protected:
     virtual MAV_LANDED_STATE landed_state() const override;
 
     bool allow_disarm() const override;
+	void send_payload_status(enum pld_status para_pld_status) override;
 
 private:
 

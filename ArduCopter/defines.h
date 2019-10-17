@@ -78,6 +78,7 @@ enum mode_reason_t {
     MODE_REASON_TERMINATE,
     MODE_REASON_TMODE,
     MODE_REASON_GPS_YAW_FAILSAFE, //baiyang added in 20180612
+    MODE_REASON_FLOWMETER_PAYLOAD//sunkaidao added in 191029
 };
 
 // Tuning enumeration

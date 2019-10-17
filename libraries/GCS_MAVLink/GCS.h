@@ -213,7 +213,10 @@ public:
     void send_sys_status();
     void send_set_position_target_global_int(uint8_t target_system, uint8_t target_component, const Location& loc);
     void send_rpm() const;
-
+//sunkaidao added in 191028
+	virtual void send_payload_status(enum pld_status para_pld_status) { };
+	
+//added end
     // return a bitmap of active channels. Used by libraries to loop
     // over active channels to send to all active channels    
     static uint8_t active_channel_mask(void) { return mavlink_active; }

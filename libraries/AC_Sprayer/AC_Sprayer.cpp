@@ -92,6 +92,15 @@ AC_Sprayer *AC_Sprayer::get_singleton()
     return _singleton;
 }
 
+void AC_Sprayer::init()
+{
+	SRV_Channels::set_output_limit(SRV_Channel::k_sprayer_pump, SRV_Channel::SRV_CHANNEL_LIMIT_MIN);
+	SRV_Channels::set_output_limit(SRV_Channel::k_sprayer_spinner, SRV_Channel::SRV_CHANNEL_LIMIT_MIN);
+
+	init_flag = 1;
+
+}
+
 void AC_Sprayer::run(const bool true_false)
 {
     // return immediately if no change
@@ -120,6 +129,11 @@ void AC_Sprayer::stop_spraying()
 /// update - adjust pwm of servo controlling pump speed according to the desired quantity and our horizontal speed
 void AC_Sprayer::update()
 {
+	if(init_flag == 0){
+		init();
+	}
+
+
     // exit immediately if we are disabled or shouldn't be running
     if (!_enabled || !running()) {
         run(false);
@@ -187,17 +201,30 @@ void AC_Sprayer::update()
 
     // if spraying or testing update the pump servo position
     if (should_be_spraying) {
-        float pos = ground_speed * _pump_pct_1ms;
-        pos = MAX(pos, 100 *_pump_min_pct); // ensure min pump speed
-        pos = MIN(pos,10000); // clamp to range
-        SRV_Channels::move_servo(SRV_Channel::k_sprayer_pump, pos, 0, 10000);
-        SRV_Channels::set_output_pwm(SRV_Channel::k_sprayer_spinner, _spinner_pwm);
-        _flags.spraying = true;
+		 float pos = ground_speed * _pump_pct_1ms;
+		 pos = MAX(pos, 100 *_pump_min_pct); // ensure min pump speed
+	     pos = MIN(pos,10000); // clamp to range
+	     //sunkaidao added in 191029
+		if(2 == _flow_type && _flags.testing == 0)
+		{
+			pos = _flow_output;
+		}
+	    //added end
+	    SRV_Channels::move_servo(SRV_Channel::k_sprayer_pump, pos, 0, 10000);
+	    SRV_Channels::set_output_pwm(SRV_Channel::k_sprayer_spinner, _spinner_pwm);
+	        _flags.spraying = true;
     } else {
         stop_spraying();
     }
 }
-
+//sunkaidao added in 191029
+void AC_Sprayer::set_flow(uint8_t _type,uint32_t _output)
+{
+	_flow_output = _output;
+	_flow_type = _type;
+	//printf("output is %d type is %d\n",_flow_output,_flow_type);
+}
+//added end
 namespace AP {
 
 AC_Sprayer *sprayer()

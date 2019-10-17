@@ -369,6 +369,11 @@ public:
         k_param_autotune_min_d, // remove
         k_param_arming, // 252  - AP_Arming
         k_param_logger = 253, // 253 - Logging Group
+		#if FLOWMETER == ENABLED
+		//sunkaidao added in 191016
+		k_param_flowmeter = 256,
+		//added end
+		#endif
 
         // 254,255: reserved
 

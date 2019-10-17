@@ -87,7 +87,7 @@
 #if CONFIG_HAL_BOARD == HAL_BOARD_SITL
  #define FXTX_AUTH 	DISABLED
 #else
- #define FXTX_AUTH 	ENABLED
+ #define FXTX_AUTH 	DISABLED
 #endif
 #endif
 

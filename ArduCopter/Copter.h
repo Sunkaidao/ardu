@@ -181,6 +181,13 @@
 #include <SITL/SITL.h>
 #endif
 
+//sunkaidao added in 191015
+#if FLOWMETER == ENABLED
+#include <AP_Flowmeter/AP_Flowmeter.h>
+#endif
+//added end
+
+
 #if FRAME_CONFIG == HELI_FRAME
     #define AC_AttitudeControl_t AC_AttitudeControl_Heli
 #else
@@ -241,6 +248,7 @@ public:
 	friend class ModeZigZagAB;
 
 	friend class AP_ABMission; //baiyang added in 20190827
+	friend class AP_Flowmeter;
 
     Copter(void);
 
@@ -601,6 +609,12 @@ private:
     // Top-level logic
     // setup the var_info table
     AP_Param param_loader;
+
+//sunkaidao added in 191015
+#if FLOWMETER == ENABLED
+	AP_Flowmeter flowmeter;
+#endif
+//added end
 
 #if FRAME_CONFIG == HELI_FRAME
     // Mode filter to reject RC Input glitches.  Filter size is 5, and it draws the 4th element, so it can reject 3 low glitches,

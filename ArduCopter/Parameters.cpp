@@ -732,6 +732,14 @@ const AP_Param::Info Copter::var_info[] = {
     GOBJECTN(mode_zigzag_ab.mission, ab_mission, "ABMIS_", AP_ABMission),
 #endif
 
+//sunkaidao added in 191016
+#if FLOWMETER == ENABLED
+	// @Group: FM_
+	// @Path: ../libraries/AP_Flowmeter/AP_Flowmeter.cpp
+	GOBJECT(flowmeter,				"FM_",		AP_Flowmeter),
+#endif
+//added end
+
     AP_VAREND
 };
 

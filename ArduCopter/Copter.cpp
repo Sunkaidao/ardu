@@ -367,6 +367,24 @@ void Copter::ten_hz_logging_loop()
 #if FRAME_CONFIG == HELI_FRAME
     Log_Write_Heli();
 #endif
+
+//sunkaidao added in 191018
+#if FLOWMETER == ENABLED
+	flowmeter.update();
+	logger.Write_flowmeter(flowmeter.get_data()._flow_rate,
+		flowmeter.get_data()._expect,
+		flowmeter.get_data()._pulses_num,
+		flowmeter.get_data()._pulses_each,
+		flowmeter.get_data()._volume,
+		flowmeter.get_data()._time,
+		flowmeter.get_data()._heart_beat,
+		flowmeter.get_data()._warning,
+		flowmeter.get_data()._height,
+		flowmeter.get_data()._output);
+#endif
+//added end
+
+
 }
 
 // twentyfive_hz_logging - should be run at 25hz
@@ -509,7 +527,6 @@ void Copter::one_hz_loop()
 
 //	printf("A. %d, %d, %d, &%d\n", gps.status(), curr_gps_week_ms.time_week, gps.time_week_ms(), &curr_gps_week_ms);
 #endif
-
 
 	
 }
@@ -659,7 +676,8 @@ Copter::Copter(void)
     rc_throttle_control_in_filter(1.0f),
     inertial_nav(ahrs),
     param_loader(var_info),
-    flightmode(&mode_stabilize)
+    flightmode(&mode_stabilize),
+    flowmeter(&inertial_nav,&sprayer,wp_nav)//sunkaidao added in 191028
 {
     // init sensor error logging flags
     sensor_health.baro = true;

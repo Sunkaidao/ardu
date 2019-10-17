@@ -283,6 +283,10 @@ public:
     void WriteCritical(const char *name, const char *labels, const char *units, const char *mults, const char *fmt, ...);
     void WriteV(const char *name, const char *labels, const char *units, const char *mults, const char *fmt, va_list arg_list, bool is_critical=false);
 
+//sunkaidao added in 191030
+	void Write_flowmeter(uint8_t flow_rate,uint16_t expect,uint32_t pulses_num,uint32_t pulses_each,uint16_t volume,uint32_t time,uint32_t heart_beat,uint8_t warning,uint8_t height,uint32_t output_pwm);
+	//const AP_Flowmeter::Flowmeter_data);
+//added end
     // This structure provides information on the internal member data of a PID for logging purposes
     struct PID_Info {
         float target;

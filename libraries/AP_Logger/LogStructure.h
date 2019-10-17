@@ -1218,6 +1218,27 @@ struct PACKED log_Arm_Disarm {
     uint16_t arm_checks;
 };
 
+struct PACKED log_Flowmeter {
+    LOG_PACKET_HEADER;
+    uint64_t time_us;
+	uint8_t 	_flow_rate;
+	uint16_t	_expect;
+    uint32_t	_pulses_num;
+	uint32_t	_pulses_each;
+	uint16_t	_volume;
+	uint32_t	_time;
+	uint32_t	_heart_beat;
+	uint8_t 	_warning;
+	uint8_t 	_height;
+	uint32_t 	_output_pwm;
+
+};
+#define FLOWMETER_LABELS "TimeUS,RA,ERA,PNM,PEH,VO,TI,HB,WAR,HE,PWM"
+#define FLOWMETER_FMT   "QBHIIHIIBBI"
+#define FLOWMETER_UNITS "s--uu-s----"
+#define FLOWMETER_MULTS "F----------"
+
+
 // FMT messages define all message formats other than FMT
 // UNIT messages define units which can be referenced by FMTU messages
 // FMTU messages associate types (e.g. centimeters/second/second) to FMT message fields
@@ -1598,7 +1619,9 @@ struct PACKED log_Arm_Disarm {
     { LOG_WHEELENCODER_MSG, sizeof(log_WheelEncoder), \
       "WENC",  "Qfbfb", "TimeUS,Dist0,Qual0,Dist1,Qual1", "sm-m-", "F0-0-" }, \
     { LOG_ADSB_MSG, sizeof(log_ADSB), \
-      "ADSB",  "QIiiiHHhH", "TimeUS,ICAO_address,Lat,Lng,Alt,Heading,Hor_vel,Ver_vel,Squark", "s-DUmhnn-", "F-GGCBCC-" }
+      "ADSB",  "QIiiiHHhH", "TimeUS,ICAO_address,Lat,Lng,Alt,Heading,Hor_vel,Ver_vel,Squark", "s-DUmhnn-", "F-GGCBCC-" }, \
+	{ LOG_FLOWMETER_MSG, sizeof(log_Flowmeter), \
+      "FLOW",  FLOWMETER_FMT,FLOWMETER_LABELS,FLOWMETER_UNITS,FLOWMETER_MULTS}
 
 
 #define LOG_SBP_STRUCTURES \
@@ -1789,8 +1812,9 @@ enum LogMessages : uint8_t {
     LOG_ARM_DISARM_MSG,
     LOG_OA_BENDYRULER_MSG,
     LOG_OA_DIJKSTRA_MSG,
+	LOG_FLOWMETER_MSG,
 
-    _LOG_LAST_MSG_
+    _LOG_LAST_MSG_,
 };
 
 static_assert(_LOG_LAST_MSG_ <= 255, "Too many message formats");

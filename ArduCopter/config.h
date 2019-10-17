@@ -770,3 +770,9 @@
 #ifndef HAL_FRAME_TYPE_DEFAULT
 #define HAL_FRAME_TYPE_DEFAULT AP_Motors::MOTOR_FRAME_TYPE_X
 #endif
+
+//sunkaidao added in 191015
+#ifndef FLOWMETER
+#define FLOWMETER ENABLED
+#endif
+//added end

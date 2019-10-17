@@ -79,6 +79,12 @@
 #define AP_SERIALMANAGER_SLCAN_BUFSIZE_RX       128
 #define AP_SERIALMANAGER_SLCAN_BUFSIZE_TX       128
 
+//sunkaidao added in 191030
+#define AP_SERIALMANAGER_FLOWMETER_GKXN_BAUD           	115200
+#define AP_SERIALMANAGER_FLOWMETER_GKXN_BUFSIZE_RX     	128
+#define AP_SERIALMANAGER_FLOWMETER_GKXN_BUFSIZE_TX     	128
+//added end
+
 class AP_SerialManager {
 public:
     AP_SerialManager();
@@ -112,6 +118,7 @@ public:
         SerialProtocol_NMEAOutput = 20,
         SerialProtocol_WindVane = 21,
         SerialProtocol_SLCAN = 22,
+        SerialProtocol_FlowMeter_GKXN = 23,
     };
 
     // get singleton instance

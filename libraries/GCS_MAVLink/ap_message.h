@@ -73,5 +73,14 @@ enum ap_message : uint8_t {
     MSG_EXTENDED_SYS_STATE,
     MSG_AUTOPILOT_VERSION,
     MSG_COMMAND_INT,
-    MSG_LAST // MSG_LAST must be the last entry in this enum
+    MSG_LAST, // MSG_LAST must be the last entry in this enum
+    MSG_PAYLOAD_STATUS
+};
+enum pld_status
+{
+	MSG_PLD_STATUS_ACK = 0b00000000,
+	MSG_PLD_STATUS_FLOWMETER = 0b00000001,
+	MSG_PLD_STATUS_SPRAYER = 0b00000010,
+	MSG_PLD_STATUS_PMBUS = 0b00000100,
+	MSG_PLD_STATUS_LAST
 };

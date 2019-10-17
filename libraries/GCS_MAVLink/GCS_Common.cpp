@@ -780,6 +780,7 @@ ap_message GCS_MAVLINK::mavlink_id_to_ap_message_id(const uint32_t mavlink_id) c
         { MAVLINK_MSG_ID_EXTENDED_SYS_STATE,    MSG_EXTENDED_SYS_STATE},
         { MAVLINK_MSG_ID_AUTOPILOT_VERSION,     MSG_AUTOPILOT_VERSION},
         { MAVLINK_MSG_ID_COMMAND_INT,           MSG_COMMAND_INT},
+        { MAVLINK_MSG_ID_PAYLOAD_STATUS,		MSG_PAYLOAD_STATUS}//sunkaidao added in 191028
             };
 
     for (uint8_t i=0; i<ARRAY_SIZE(map); i++) {
@@ -4399,6 +4400,14 @@ bool GCS_MAVLINK::try_send_message(const enum ap_message id)
 #endif
         break;
     }
+	//	added by ZhangYong 20170719
+	
+	case MSG_PAYLOAD_STATUS:
+			CHECK_PAYLOAD_SIZE(PAYLOAD_STATUS);
+#if FLOWMETER == ENABLED
+			send_payload_status(MSG_PLD_STATUS_FLOWMETER);
+#endif
+	break;
 
     default:
         // try_send_message must always at some stage return true for

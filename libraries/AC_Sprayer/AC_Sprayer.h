@@ -60,8 +60,13 @@ public:
     /// update - adjusts servo positions based on speed and requested quantity
     void update();
 
-	int16_t get_unspray_dist() { return (_unspray_dist.get()-50);}
+	int16_t get_unspray_dist() const { return (_unspray_dist.get()-50);}
+//sunkaidao added in 191029
 
+	void init();
+
+	void set_flow(uint8_t _type,uint32_t _output);
+//added end
     static const struct AP_Param::GroupInfo var_info[];
 
 private:
@@ -85,6 +90,13 @@ private:
     // internal variables
     uint32_t        _speed_over_min_time;   ///< time at which we reached speed minimum
     uint32_t        _speed_under_min_time;  ///< time at which we fell below speed minimum
+
+	//sunkaidao added in 191029
+	uint8_t			_flow_type;
+	uint32_t 		_flow_output;
+
+	bool init_flag;
+	//added end
 
     void stop_spraying();
 };

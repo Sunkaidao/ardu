@@ -1026,3 +1026,25 @@ void AP_Logger::Write_OADijkstra(uint8_t state, uint8_t curr_point, uint8_t tot_
     };
     WriteBlock(&pkt, sizeof(pkt));
 }
+//sunkaidao added in 191030
+void AP_Logger::Write_flowmeter(uint8_t flow_rate,uint16_t expect,uint32_t pulses_num,uint32_t pulses_each,uint16_t volume,uint32_t time,uint32_t heart_beat,uint8_t warning,uint8_t height,uint32_t output_pwm)
+{
+	struct log_Flowmeter pkt{
+		LOG_PACKET_HEADER_INIT(LOG_FLOWMETER_MSG),
+		time_us 	: AP_HAL::micros64(),
+		_flow_rate		:	flow_rate,
+		_expect			:	expect,
+    	_pulses_num		:	pulses_num,
+		_pulses_each	:	pulses_each	,
+		_volume			:	volume,
+		_time			:	time,
+		_heart_beat		:	heart_beat,
+	 	_warning		:	warning,
+	 	_height			:	height,
+	 	_output_pwm		:	output_pwm
+		};
+		WriteBlock(&pkt, sizeof(pkt));
+
+		
+}
+//added end

@@ -172,6 +172,79 @@ void GCS_MAVLINK_Copter::send_nav_controller_output() const
         0,
         flightmode->crosstrack_error() * 1.0e-2f);
 }
+//sunkaidao added in 191028
+void GCS_MAVLINK_Copter::send_payload_status(enum pld_status para_pld_status)
+{
+
+	uint8_t payload_type = 0;
+	uint8_t payload_status[8];
+	memset(payload_status, 0, 8);
+
+	payload_type = para_pld_status;
+
+	
+
+	switch(para_pld_status)
+	{
+	//sunkaidao added in 190426
+		case MSG_PLD_STATUS_ACK:
+			mavlink_msg_payload_status_send(chan, \
+																			AP_HAL::millis(), \
+																			payload_type, \
+																			0, \
+																			0, \
+																			0, \
+																			0, \
+																			0, \
+																			0, \
+																			0, \
+																			0);
+
+
+			break;
+	
+		case MSG_PLD_STATUS_FLOWMETER:
+			//sunkaidao add in 181121
+			//sunkaidao modify in 190222
+#if FLOWMETER == ENABLED
+		//printf("*****************************gcs_mavlink is ture\n");
+		if(copter.flowmeter.get_type())
+		{
+			payload_status[0] =copter.flowmeter.get_data()._warning&0xff;
+			payload_status[1] =copter.flowmeter.get_data()._heart_beat&0xff;
+			payload_status[2] =copter.flowmeter.get_data()._volume&0xff;
+			payload_status[3] =	((copter.flowmeter.get_data()._volume>>8)&0xff);
+			payload_status[4] =	(copter.flowmeter.get_data()._height&0xff);
+			payload_status[5] =	((copter.flowmeter.get_data()._height>>8)&0xff);
+			payload_status[6] =copter.flowmeter.get_data()._time&0xff;
+			payload_status[7] = copter.flowmeter.get_data()._flow_rate&0xff;
+			mavlink_msg_payload_status_send(chan, \
+																AP_HAL::millis(), \
+																payload_type, \
+																payload_status[0], \
+																payload_status[1], \
+																payload_status[2], \
+																payload_status[3], \
+																payload_status[4], \
+																payload_status[5], \
+																payload_status[6], \
+																payload_status[7]);
+			}			
+#endif		
+
+			break;
+
+			default:
+				
+				break;
+		
+	}	// end of switch(para_pld_status)
+
+
+	//printf("%d %d %d %d %d\n", lcl_cnt, payload_type, lcl_int16_t, payload_status[0], payload_status[1]);
+}
+
+//added end
 
 int16_t GCS_MAVLINK_Copter::vfr_hud_throttle() const
 {
@@ -1353,7 +1426,33 @@ void GCS_MAVLINK_Copter::handleMessage(const mavlink_message_t &msg)
         copter.g2.toy_mode.handle_message(msg);
         break;
 #endif
-        
+
+		//sunkaidao added in 190115
+		
+#if FLOWMETER == ENABLED
+		case MAVLINK_MSG_ID_PAYLOAD_STATUS:
+			mavlink_payload_status_t	packe;
+			mavlink_msg_payload_status_decode(&msg, &packe);
+			if(packe.payload_status0==MAVLINK_PAYLOD_NULL)
+				break;
+			if(packe.payload_status0==MAVLINK_PAYLOD_START)
+			{
+				copter.sprayer.run(true);
+				copter.sprayer.test_pump(true);
+				send_payload_status(MSG_PLD_STATUS_ACK);
+					
+			}
+		if(packe.payload_status0==MAVLINK_PAYLOD_STOP)
+			{
+				copter.flowmeter.set_coeffcient((copter.flowmeter.get_data()._pulses_num*100)/copter.flowmeter.get_adjustment_amount());
+				copter.sprayer.run(false);
+				copter.sprayer.test_pump(false);
+				send_payload_status(MSG_PLD_STATUS_ACK);
+			}
+			break;
+#endif
+		//added end
+
     default:
         handle_common_message(msg);
         break;
