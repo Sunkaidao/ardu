@@ -740,6 +740,14 @@ const AP_Param::Info Copter::var_info[] = {
 #endif
 //added end
 
+//baiyang added in 20180207
+#if NEWBROADCAST== ENABLED
+	// @Group: NBC_
+	// @Path: ../libraries/AP_NewBroadcast/AP_NewBroadcast.cpp
+	GOBJECT(newbroadcast,"NBC_", AP_NewBroadcast),
+#endif
+//added end
+
     AP_VAREND
 };
 

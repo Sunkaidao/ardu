@@ -1407,7 +1407,7 @@ void AP_ABMission::update_rgb()
 
 void AP_ABMission::update_spray_dist()
 {
-	//width = 700;//(copter.sprayer.get_unspray_dist()-50);
+	//width = 700;//(copter.sprayer.get_unspray_dist());
 }
 
 void AP_ABMission::update()

@@ -187,6 +187,12 @@
 #endif
 //added end
 
+//baiyang added in 20180206
+#if NEWBROADCAST == ENABLED
+#include <AP_NewBroadcast/AP_NewBroadcast.h>
+#endif
+//added end
+
 
 #if FRAME_CONFIG == HELI_FRAME
     #define AC_AttitudeControl_t AC_AttitudeControl_Heli
@@ -613,6 +619,12 @@ private:
 //sunkaidao added in 191015
 #if FLOWMETER == ENABLED
 	AP_Flowmeter flowmeter;
+#endif
+//added end
+
+//baiyang added in 20180206
+#if NEWBROADCAST == ENABLED
+	AP_NewBroadcast newbroadcast;
 #endif
 //added end
 

@@ -377,6 +377,7 @@ public:
 
         // 254,255: reserved
 
+		k_param_newbroadcast = 300,
 		k_param_failsafe_gps_yaw = 301,
 		k_param_ab_mission       = 302,
         // the k_param_* space is 9-bits in size

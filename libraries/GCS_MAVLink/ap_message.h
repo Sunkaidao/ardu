@@ -73,6 +73,7 @@ enum ap_message : uint8_t {
     MSG_EXTENDED_SYS_STATE,
     MSG_AUTOPILOT_VERSION,
     MSG_COMMAND_INT,
+    MSG_NEWBROADCAST_FLIGHT_STA,
     MSG_LAST, // MSG_LAST must be the last entry in this enum
     MSG_PAYLOAD_STATUS
 };

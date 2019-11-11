@@ -369,6 +369,16 @@ bool GCS_MAVLINK_Copter::try_send_message(enum ap_message id)
 		copter.mode_auto.mission.send_mission_breakpoint(chan,copter.g.sysid_this_mav);
 #endif
 		break;
+
+//baiyang added in 20180409
+#if NEWBROADCAST == ENABLED
+	case MSG_NEWBROADCAST_FLIGHT_STA:
+		CHECK_PAYLOAD_SIZE(NEWBROADCAST_FLIGHT_STA);
+		copter.newbroadcast.send_flight_status(chan);
+		break;
+#endif		
+//added end
+
     default:
         return GCS_MAVLINK::try_send_message(id);
     }
@@ -490,7 +500,8 @@ static const ap_message STREAM_EXTENDED_STATUS_msgs[] = {
     MSG_NAV_CONTROLLER_OUTPUT,
     MSG_FENCE_STATUS,
     MSG_POSITION_TARGET_GLOBAL_INT,
-    MSG_COMMAND_INT
+    MSG_COMMAND_INT,
+    MSG_NEWBROADCAST_FLIGHT_STA
 };
 static const ap_message STREAM_POSITION_msgs[] = {
     MSG_LOCATION,
@@ -1316,6 +1327,18 @@ void GCS_MAVLINK_Copter::handleMessage(const mavlink_message_t &msg)
 #endif
         break;
     }
+	
+#if NEWBROADCAST == ENABLED
+//baiyang added in 20180409
+	case MAVLINK_MSG_ID_NEWBROADCAST_STR:
+	{
+	    mavlink_newbroadcast_str_t packet;
+	    mavlink_msg_newbroadcast_str_decode(&msg, &packet);	
+        copter.newbroadcast.handle_msg_newbroadcast_str(packet,chan);
+        break;
+	}
+//added end
+#endif
 
     case MAVLINK_MSG_ID_OBSTACLE_DISTANCE:
     {

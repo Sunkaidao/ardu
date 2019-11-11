@@ -102,6 +102,10 @@ void Copter::userhook_init()
     mode_zigzag_ab.mission.set_turning_type_parameter(g2.wp_turn_type);
 #endif
 
+#if NEWBROADCAST == ENABLED
+    newbroadcast.init();
+#endif
+
 }
 #endif
 
@@ -116,6 +120,9 @@ void Copter::userhook_FastLoop()
 void Copter::userhook_50Hz()
 {
     // put your 50Hz code here
+#if NEWBROADCAST == ENABLED
+    newbroadcast.update();
+#endif
 }
 #endif
 
@@ -123,6 +130,9 @@ void Copter::userhook_50Hz()
 void Copter::userhook_MediumLoop()
 {
     // put your 10Hz code here
+#if NEWBROADCAST == ENABLED
+	newbroadcast.update_view();
+#endif
 }
 #endif
 
