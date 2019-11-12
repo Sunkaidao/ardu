@@ -527,8 +527,13 @@ void Copter::one_hz_loop()
 
 //	printf("A. %d, %d, %d, &%d\n", gps.status(), curr_gps_week_ms.time_week, gps.time_week_ms(), &curr_gps_week_ms);
 #endif
+	//printf("copter speed is %f\n",wp_nav->get_default_speed_xy());
 
-	
+#if GASSENSOR == ENABLED
+	gassensor.update(serial_manager);
+	logger.Log_Write_Sensor(gassensor.get_sensor12_data());
+
+#endif
 }
 
 // called at 50hz
@@ -676,8 +681,10 @@ Copter::Copter(void)
     rc_throttle_control_in_filter(1.0f),
     inertial_nav(ahrs),
     param_loader(var_info),
-    flightmode(&mode_stabilize),
-    flowmeter(&inertial_nav,&sprayer,wp_nav)//sunkaidao added in 191028
+    flightmode(&mode_stabilize)
+#if FLOWMETER == ENABLED
+	,flowmeter(&inertial_nav,&sprayer)//sunkaidao added in 191028
+#endif
 {
     // init sensor error logging flags
     sensor_health.baro = true;

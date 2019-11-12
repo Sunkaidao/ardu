@@ -86,7 +86,8 @@ COMMON_VEHICLE_DEPENDENT_LIBRARIES = [
     'AP_ToshibaCAN',
     'AP_NMEA_Output',
     'AP_Filesystem',
-    'AP_Flowmeter'
+    'AP_Flowmeter',
+    'AP_Gassensor'
 ]
 
 def get_legacy_defines(sketch_name):

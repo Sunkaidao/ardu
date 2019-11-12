@@ -407,6 +407,14 @@ void AP_SerialManager::init()
 										 AP_SERIALMANAGER_FLOWMETER_GKXN_BUFSIZE_TX);
 					break;	
 				//added end
+				//sunkaidao added in 191112
+				case SerialProtocol_Airsensor:
+					state[i].baud = AP_SERIALMANAGER_AIRSENSOR_BAUD  / 1000;	 // update baud param in case user looks at it
+					state[i].uart->begin(map_baudrate(state[i].baud),
+					AP_SERIALMANAGER_AIRSENSOR_BUFSIZE_RX,
+					AP_SERIALMANAGER_AIRSENSOR_BUFSIZE_TX);
+				break;	
+				//adden end
                 default:
                     state[i].uart->begin(map_baudrate(state[i].baud));
             }

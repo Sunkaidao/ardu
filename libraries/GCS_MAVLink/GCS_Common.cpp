@@ -4404,9 +4404,8 @@ bool GCS_MAVLINK::try_send_message(const enum ap_message id)
 	
 	case MSG_PAYLOAD_STATUS:
 			CHECK_PAYLOAD_SIZE(PAYLOAD_STATUS);
-#if FLOWMETER == ENABLED
 			send_payload_status(MSG_PLD_STATUS_FLOWMETER);
-#endif
+			send_payload_status(MSG_PLD_STATUS_GAS);
 	break;
 
     default:

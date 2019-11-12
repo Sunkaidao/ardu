@@ -128,3 +128,13 @@ struct current_gps_week_ms
 #endif
 
 #define SPRAYER_ENABLED       ENABLED
+
+//sunkaidao added in 191015
+#ifndef FLOWMETER
+#define FLOWMETER ENABLED
+#endif
+//added end
+#ifndef GASSENSOR
+#define GASSENSOR ENABLED
+#endif
+

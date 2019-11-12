@@ -1048,3 +1048,24 @@ void AP_Logger::Write_flowmeter(uint8_t flow_rate,uint16_t expect,uint32_t pulse
 		
 }
 //added end
+void AP_Logger::Log_Write_Sensor(float *sensor)
+{
+	struct log_Sensor pkt={
+		LOG_PACKET_HEADER_INIT(LOG_SENSOR_MSG),
+			time_us 	  : AP_HAL::micros64(),
+			CO			:sensor[0],
+			SO2 		:sensor[1],
+			NO2 		:sensor[2],
+			O3			:sensor[3],
+			X1			:sensor[4],
+			X2			:sensor[5],
+			CO2 		:sensor[6],
+			PM1_0		:sensor[7],
+			PM2_5		:sensor[8],
+			PM10		:sensor[9],
+			TEMP		:sensor[10],
+			HUM 		:sensor[11],
+	};
+	WriteBlock(&pkt, sizeof(pkt));
+
+}

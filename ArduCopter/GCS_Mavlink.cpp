@@ -231,9 +231,70 @@ void GCS_MAVLINK_Copter::send_payload_status(enum pld_status para_pld_status)
 																payload_status[7]);
 			}			
 #endif		
-
-			break;
-
+		case MSG_PLD_STATUS_GAS:
+#if GASSENSOR == ENABLED
+			uint8_t *data6;
+			uint8_t *data12;
+				data12 = copter.gassensor.get_rx_date_12();
+				data6 = copter.gassensor.get_rx_date_6();
+				mavlink_msg_payload_status_send(chan,
+					AP_HAL::millis(),
+					MSG_PLD_STATUS_GAS,
+					0,1,
+					data12[5],data12[6],
+					data12[7],data12[8],
+					data12[9],data12[10]);
+				mavlink_msg_payload_status_send(chan,
+					AP_HAL::millis(),
+					MSG_PLD_STATUS_GAS,
+					0,2,
+					data12[15],data12[16],
+					data12[17],data12[18],
+					data6[19],data6[20]);
+				mavlink_msg_payload_status_send(chan,
+					AP_HAL::millis(),
+					MSG_PLD_STATUS_GAS,
+					0,3,
+					data6[25],data6[26],
+					data6[27],data6[28],
+					data6[29],data6[30]);
+				mavlink_msg_payload_status_send(chan,
+					AP_HAL::millis(),
+					MSG_PLD_STATUS_GAS,
+					0,4,
+					data6[35],data6[36],
+					data6[37],data6[38],
+					data6[39],data6[40]);
+				mavlink_msg_payload_status_send(chan,
+					AP_HAL::millis(),
+					MSG_PLD_STATUS_GAS,
+					0,5,
+					data6[45],data6[46],
+					data6[47],data6[48],
+					data6[49],data6[50]);
+				mavlink_msg_payload_status_send(chan,
+					AP_HAL::millis(),
+					MSG_PLD_STATUS_GAS,
+					0,6,
+					data6[55],data6[56],
+					data6[57],data6[58],
+					data6[59],data6[60]);
+				mavlink_msg_payload_status_send(chan,
+					AP_HAL::millis(),
+					MSG_PLD_STATUS_GAS,
+					0,7,
+					data6[15],data6[16],
+					data6[17],data6[18],
+					data6[19],data6[20]);
+				mavlink_msg_payload_status_send(chan,
+					AP_HAL::millis(),
+					MSG_PLD_STATUS_GAS,
+					0,8,
+					data6[21],data6[22],
+					data6[23],data6[24],
+					data6[25],data6[26]);
+				break;
+#endif
 			default:
 				
 				break;
