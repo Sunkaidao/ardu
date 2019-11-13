@@ -65,6 +65,12 @@ public:
 	void set_coeffcient(float coe);
 	
 	uint16_t get_adjustment_amount(){return _adjustment_amount;}
+
+	void spray_amount(uint8_t grouping);
+	
+#if GROUPING == ENABLED
+	uint8_t short_flag;
+#endif
 static const struct AP_Param::GroupInfo var_info[];
 
 protected:
@@ -107,4 +113,6 @@ private:
 	bool		last_flag;
 	bool		_return;
 	}rtf;
+	
+	uint8_t	group_amount;//group val
 };

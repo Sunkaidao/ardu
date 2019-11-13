@@ -1418,3 +1418,26 @@ float AC_WPNav::get_slow_down_speed(float dist_from_dest_cm, float accel_cmss)
         return target_speed;
     }
 }
+
+#if GROUPING == ENABLED
+//sunkaidao added in 190828
+/// set_wp_destination waypoint using location class
+///     returns false if conversion from location to vector from ekf origin cannot be calculated
+bool AC_WPNav::set_destination(const Location& destination)
+{
+    bool terr_alt;
+    Vector3f dest_neu;
+
+    // convert destination location to vector
+    if (!get_vector_NEU(destination, dest_neu, terr_alt)) {
+		return false;
+    }
+
+	//printf("set_wp_destination x %4.2f, y %4.2f, z %4.2f\n", dest_neu.x, dest_neu.y, dest_neu.z);
+	_destination_do = dest_neu;
+    // set target as vector from EKF origin
+    return true;
+}
+//added end
+#endif
+

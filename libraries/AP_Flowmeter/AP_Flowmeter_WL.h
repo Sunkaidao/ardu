@@ -23,11 +23,14 @@ public:
 	void init() override;
 	void update() override;
 	void calculate();
-	uint16_t expect();
+	uint16_t compute_speed();
 	void control(uint16_t _expect);
 	void NO_drug();
 	void rtl_do();
-
+	
+#if GROUPING == ENABLED
+	uint16_t compute_speed_grouping(uint8_t group_val);
+#endif
 protected:
     // parameters for each instance
 

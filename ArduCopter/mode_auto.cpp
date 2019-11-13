@@ -531,6 +531,13 @@ bool ModeAuto::start_command(const AP_Mission::Mission_Command& cmd)
         do_winch(cmd);
         break;
 #endif
+//sunkaidao added 191114
+#if GROUPING == ENABLED
+	case MAV_CMD_DO_GROUPING:
+		do_group(cmd);
+		break;
+#endif
+//added end
 
     default:
         // unable to use the command, allow the vehicle to try the next command
@@ -722,7 +729,11 @@ bool ModeAuto::verify_command(const AP_Mission::Mission_Command& cmd)
     case MAV_CMD_CONDITION_YAW:
         cmd_complete = verify_yaw();
         break;
-
+#if GROUPING == ENABLED
+	case MAV_CMD_DO_GROUPING:
+        cmd_complete = verify_group(cmd);
+        break;
+#endif
     // do commands (always return true)
     case MAV_CMD_DO_CHANGE_SPEED:
     case MAV_CMD_DO_SET_HOME:
@@ -1161,6 +1172,11 @@ void ModeAuto::do_nav_wp(const AP_Mission::Mission_Command& cmd)
     loiter_time = 0;
     // this is the delay, stored in seconds
     loiter_time_max = cmd.p1;
+	//sunkaidao added in 190606
+#if GROUPING == ENABLED
+	loiter_time_max = cmd.p1>>8;
+	copter.flowmeter.short_flag = cmd.p1 & 0xff;
+#endif
 
     // Set wp navigation target
     wp_start(target_loc);
@@ -1612,6 +1628,29 @@ void ModeAuto::do_circle_or_nav_wp_smooth(const AP_Mission::Mission_Command& cmd
 		do_nav_wp_smooth(cmd_tmp);
 	}
 }
+//sunkaidao added in 191114
+#if GROUPING == ENABLED
+void ModeAuto::do_group(const AP_Mission::Mission_Command& cmd)
+{
+
+	Location dest;
+	dest.lat = cmd.content.location.lat;
+	dest.lng =  cmd.content.location.lng;
+//	dest.flags =  cmd.content.location.flags;
+//	dest.options =  cmd.content.location.options;
+	dest.alt = cmd.content.location.alt;
+#if GROUPING == ENABLED
+	if(!wp_nav->set_destination(dest))
+	{
+		return;
+	}
+#endif
+	copter.flowmeter.spray_amount(cmd.p1 & 0xFF);
+
+
+}
+#endif
+//added end
 
 /********************************************************************************/
 //	Verify Nav (Must) commands
@@ -2062,3 +2101,57 @@ bool ModeAuto::verify_circle_loose(const AP_Mission::Mission_Command& cmd)
 
 
 #endif
+
+//sunkaidao added in 191114
+#if GROUPING ==ENABLED
+bool ModeAuto::verify_group(const AP_Mission::Mission_Command& cmd)
+{
+	Vector3f curr_pos = wp_nav->get_inav_position();
+	// calculate terrain adjustments
+	float terr_offset = 0.0f;
+	if (wp_nav->get_terrain_alt() && !wp_nav->get_terrain_offset_do(terr_offset)) {
+	   return false;
+	}
+	Vector3f curr_delta = (curr_pos - Vector3f(0,0,terr_offset)) - wp_nav->get_origin();
+	//(curr_pos - Vector3f(0,0,terr_offset)) - wp_nav->_origin;
+	Vector3f dist_delta = (curr_pos - Vector3f(0,0,terr_offset)) - wp_nav->get_destination_do();
+	//(curr_pos - Vector3f(0,0,terr_offset)) - wp_nav->_destination_do;
+	curr_delta.z = 0;
+	dist_delta.z = 0;
+	
+	float vector =( curr_delta.x + curr_delta.y ) * ( dist_delta.x + dist_delta.y );
+	   
+
+	/*
+	//sunkaidao
+	   static int step = 0;
+	   step++;
+	   if(step>10)
+	   {
+	   DataFlash_Class::instance()->Log_Write("ZZZB", "TimeUS,CX,DX,CY,DY,VE,DEX,DEY,NX,NY,OX,OY", "Qfffffffffff",
+					   AP_HAL::micros64(),
+					   curr_delta.x,
+					   dist_delta.x,
+					   curr_delta.y,
+					   dist_delta.y,
+					   vector,
+					   wp_nav->get_destination_do().x,
+					   wp_nav->get_destination_do().y,
+					   curr_pos.x,
+					   curr_pos.y,
+					   wp_nav->get_origin().x,
+					   wp_nav->get_origin().y
+					   );
+	   }
+	*/
+	 
+	if(vector > 0&&curr_delta.length() >= dist_delta.length())  
+	{
+		return true;
+	}
+		return false;
+
+}
+#endif
+//added end
+

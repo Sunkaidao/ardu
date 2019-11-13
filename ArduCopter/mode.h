@@ -416,6 +416,7 @@ private:
     void do_payload_place(const AP_Mission::Mission_Command& cmd);
     void do_RTL(void);
     void do_circle_or_nav_wp_smooth(const AP_Mission::Mission_Command& cmd);
+	void do_group(const AP_Mission::Mission_Command& cmd);
 
     bool verify_takeoff();
     bool verify_land();
@@ -436,6 +437,7 @@ private:
     bool verify_nav_delay(const AP_Mission::Mission_Command& cmd);
 	bool verify_zigzag_ab(const AP_Mission::Mission_Command& cmd);
 	bool verify_circle_loose(const AP_Mission::Mission_Command& cmd);
+	bool verify_group(const AP_Mission::Mission_Command& cmd);
 
 
     // Loiter control

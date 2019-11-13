@@ -9,6 +9,7 @@
 #include <AC_AttitudeControl/AC_AttitudeControl.h> // Attitude control library
 #include <AP_Terrain/AP_Terrain.h>
 #include <AC_Avoidance/AC_Avoid.h>                 // Stop at fence library
+#include "./../ArduCopter/Roflying_Config.h"		//sunkaidao added in 191114
 
 // maximum velocities and accelerations
 #define WPNAV_ACCELERATION              100.0f      // defines the default velocity vs distant curve.  maximum acceleration in cm/s/s that position controller asks for from acceleration controller
@@ -244,6 +245,16 @@ public:
 
 	void clear_wp_last_update(){ _wp_last_update = 0;} //baiyang added in 20190911
 
+	#if GROUPING == ENABLED
+//sunkaidao added in 191114
+	bool set_destination(const Location& destination);
+	Vector3f get_inav_position(){return _inav.get_position();}
+	Vector3f get_destination_do(){return _destination_do;}
+	Vector3f get_origin(){return _origin;}
+	bool get_terrain_alt(){return _terrain_alt;}
+    bool get_terrain_offset_do(float& offset_cm){return get_terrain_offset(offset_cm);}
+#endif
+
     static const struct AP_Param::GroupInfo var_info[];
 
 protected:
@@ -345,4 +356,9 @@ protected:
 
 	float       _throttle_alt_offset_last;
 	float       _smoothing_speed;
+
+	#if GROUPING == ENABLED
+	//sunkaidao added in 191114
+	Vector3f _destination_do;
+	#endif
 };
