@@ -119,6 +119,7 @@ public:
         SerialProtocol_WindVane = 21,
         SerialProtocol_SLCAN = 22,
         SerialProtocol_FlowMeter_GKXN = 23,
+        SerialProtocol_NewBroadcast = 24,
     };
 
     // get singleton instance

@@ -39,7 +39,7 @@ public:
     // accessor for flighttime. Returns 0 if not flying, otherwise
     // total time flying since boot in seconds
     uint32_t get_flight_time_s(void);
-    
+	
     // get singleton
     static AP_Stats *get_singleton(void) {
         return _singleton;

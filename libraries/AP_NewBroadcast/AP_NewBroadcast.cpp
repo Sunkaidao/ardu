@@ -137,6 +137,9 @@ uint8_t AP_NewBroadcast::detect_backends()
 		case NewBroadcast_TYPE_GK_CAN:
 			new_backend = new AP_NewBroadcast_CAN(payload);
 			break;
+		case NewBroadcast_TYPE_SERIAL:
+			new_backend = new AP_NewBroadcast_serial(payload);
+			break;
 		default:
 			break;
 	}
@@ -283,6 +286,12 @@ void AP_NewBroadcast :: update_view_flight_seq()
             if(AP::arming().is_armed())
             {
                 timer = AP_HAL::millis64();
+
+				_flight_seq += 1;
+                _flight_seq.set_and_save(_flight_seq);
+					
+                flight_time_last = AP::stats()->get_flight_time_s();
+					
                 view_step = 1;
             }
             else
@@ -293,10 +302,8 @@ void AP_NewBroadcast :: update_view_flight_seq()
         case 1:
             if(AP::arming().is_armed())
             {
-                if(AP_HAL::millis64()-timer>=5000)
+                if(AP_HAL::millis64()-timer>=1)
                 {
-                    _flight_seq += 1;
-                    _flight_seq.set_and_save(_flight_seq);
                     view_step = 2;
                 }
             }
@@ -377,7 +384,7 @@ void AP_NewBroadcast :: update_view_state()
 
 void AP_NewBroadcast :: update_view_flight_time()
 {
-	view.flight_time = AP::stats()->get_flight_time_s() * 1000;
+	view.flight_time = AP::stats()->get_flight_time_s() - flight_time_last;
 }
 
 void AP_NewBroadcast :: update_view_longitude()

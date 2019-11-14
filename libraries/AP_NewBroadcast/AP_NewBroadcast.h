@@ -40,6 +40,7 @@
 #include <AP_GPS/AP_GPS.h>             // ArduPilot GPS library
 
 #include "AP_NewBroadcast_CAN.h"
+#include "AP_NewBroadcast_serial.h"
 #include "NewBroadcast_Backend.h"
 
 #if NEWBROADCAST == ENABLED 
@@ -51,6 +52,7 @@ public:
 enum NewBroadcast_Type {
 	NewBroadcast_TYPE_NONE  = 0,
    	NewBroadcast_TYPE_GK_CAN  = 1,
+   	NewBroadcast_TYPE_SERIAL  = 2,
 
 };
     AP_NewBroadcast();
@@ -71,6 +73,8 @@ private:
 	uint64_t flight_area_m2_curr;	
 	uint64_t flight_area_m2_pre;
 	uint64_t timer;
+
+	uint32_t flight_time_last;
 
     Message_info view;
 	Message_send_union payload;
