@@ -376,7 +376,7 @@ void Copter::ten_hz_logging_loop()
 		flowmeter.get_data()._pulses_num,
 		flowmeter.get_data()._pulses_each,
 		flowmeter.get_data()._volume,
-		flowmeter.get_data()._time,
+		flowmeter.get_data()._pulses_time,
 		flowmeter.get_data()._heart_beat,
 		flowmeter.get_data()._warning,
 		flowmeter.get_data()._height,

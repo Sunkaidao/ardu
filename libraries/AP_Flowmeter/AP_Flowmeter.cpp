@@ -111,14 +111,25 @@ void AP_Flowmeter::update(void)
 	if(drivers == nullptr)
 		return;
 	drivers->update();	
+/////////////////////////////////
+//	No drugs return add here
+//	rtl_do;
+////////////////////////////////
 	//rtl_do();
 }
 void AP_Flowmeter::rtl_do()
 {
+////////////////////////////////
+//_rtl_switch is switch  change to 
+//data._warning is no drugs flag
+//_type 2 is wl  1 is GKXN li
+//close sprayer run,test send text payload emergency!
+////////////////////////////////
+
 	if(\
 		(_rtl_switch == 1) && \
 		(data._warning== 1) && \
-		(1 ==_type)  && \
+		(2 ==_type)  && \
 		copter.motors->armed()
 	)
 	{
@@ -133,6 +144,10 @@ uint8_t AP_Flowmeter::get_armed()
 {	
 	return copter.motors->armed();
 }
+////////////////////
+//about calibration
+//change _coefficient
+///////////////////
 void AP_Flowmeter::set_coeffcient(float coe)
 {
 	_coefficient.set_and_save(coe);

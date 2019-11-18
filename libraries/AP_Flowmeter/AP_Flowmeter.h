@@ -30,25 +30,25 @@ public:
 	friend class AP_Flowmeter_li;
 	struct Flowmeter_State {
 		
-		uint32_t			   last_reading_ms; // time of last reading
+//		uint32_t			   last_reading_ms; // time of last reading
 		uint32_t			   dt_ms;			  // time change (in milliseconds) for the previous period (used to calculating rate)
-		uint32_t				_pulse_val;
-		uint32_t				_time;
+		uint32_t				_pulse_val;		//
 		uint32_t				_pulses_each;
 	};
 	
 	struct Flowmeter_data {
-		uint32_t	_pulses_num;
-		uint16_t	_volume;
-		uint32_t	_pulses_each;
-		uint8_t 	_flow_rate;
-		uint32_t	_time;
+		uint32_t	_pulses_num;		//Number of pulses
+		uint16_t	_volume;			//volume
+		uint32_t	_pulses_each;		//Each time unit Number of pulses   Num / 0.1s
+		uint8_t 	_flow_rate;			//Flow rate
+		uint32_t	_time;				//li
+		uint32_t	_pulses_time;
 		//uint32_t	_package_val;
-		uint32_t 	_heart_beat;
-		uint8_t		_warning;
-		uint8_t		_height;
-		uint16_t	_expect;
-		uint32_t	_output;
+		uint32_t 	_heart_beat;		//Heartbeat package
+		uint8_t		_warning;			//Drug-free alarm		
+		uint8_t		_height;			//height
+		uint16_t	_expect;			//Expected flow rate	ml/s
+		uint32_t	_output;			//Pwm output 0-10000
 	};
 
 

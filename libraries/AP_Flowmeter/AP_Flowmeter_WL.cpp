@@ -27,6 +27,11 @@ void AP_Flowmeter_WL::update()
 	if(res != 1)
 		return;
 	calculate();
+////////////////////////////////
+//Add short sides here
+//if short != 1 	
+//NO_drug
+////////////////////////////////
 	NO_drug();
 	control(expect());
 	_sprayer->set_flow(get_type(),actual_pump_rate);
@@ -36,7 +41,7 @@ void AP_Flowmeter_WL::calculate()
 	_data._pulses_each = _status._pulse_val - _data._pulses_num;
 	_data._pulses_num = _status._pulse_val;
 	_data._volume = _status._pulse_val*100/get_coeffcient();
-	_data._time = _status.dt_ms;
+	_data._pulses_time = _status.dt_ms;
 	_data._flow_rate = 500000*4*100/_status.dt_ms/get_coeffcient();
 	_data._pulses_each = _status._pulses_each;
 	_data._warning = rtf._return;
@@ -186,9 +191,7 @@ void AP_Flowmeter_WL::flow_drivers_update(void)
 
 	void *irqstate = hal.scheduler->disable_interrupts_save();
 	//printf("\nlast_reading_ms is %d time_flag is %d\nreturn is %d\n",irq_state.last_reading_ms,irq_state.pulse_four_time_flag,irq_state.pulse_four_time);
-	copy_state_to_frontend(irq_state.distance_count,
-							   irq_state.total_count,
-							   irq_state.error_count,
+	copy_state_to_frontend(	   irq_state.total_count,
 							   irq_state.pulse_four_time);
 	hal.scheduler->restore_interrupts(irqstate);
 }

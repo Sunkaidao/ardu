@@ -20,13 +20,15 @@ AP_Flowmeter_Backend::~AP_Flowmeter_Backend()
 
 
 // copy state to front end helper function
-void AP_Flowmeter_Backend::copy_state_to_frontend(int32_t distance_count, uint32_t total_count, uint32_t error_count, uint32_t last_reading_ms)
+void AP_Flowmeter_Backend::copy_state_to_frontend(uint32_t total_count, uint32_t last_reading_ms)
 {
+/*
     if(_status.last_reading_ms == last_reading_ms)
 		_status.dt_ms = 0 ;
 	else
-    	_status.dt_ms = last_reading_ms;
-    _status.last_reading_ms = last_reading_ms;
+*/
+    _status.dt_ms = last_reading_ms;
+//    _status.last_reading_ms = last_reading_ms;
 
 	_status._pulses_each = total_count - _status._pulse_val;
 	_status._pulse_val = total_count;

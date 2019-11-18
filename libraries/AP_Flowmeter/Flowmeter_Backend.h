@@ -43,8 +43,9 @@ protected:
 	uint16_t get_volume_backend(){return _frontend._volume.get();}
 
 
-    void copy_state_to_frontend(int32_t distance_count, uint32_t total_count, uint32_t error_count, uint32_t last_reading_ms);
 
+	void copy_state_to_frontend(uint32_t total_count, uint32_t last_reading_ms);
+    
     AP_Flowmeter &_frontend;
     AP_Flowmeter::Flowmeter_State &_status;
 	AP_Flowmeter::Flowmeter_data &_data;

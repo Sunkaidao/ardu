@@ -1465,7 +1465,7 @@ void GCS_MAVLINK_Copter::handleMessage(const mavlink_message_t &msg)
 				send_payload_status(MSG_PLD_STATUS_ACK);
 					
 			}
-		if(packe.payload_status0==MAVLINK_PAYLOD_STOP)
+			if(packe.payload_status0==MAVLINK_PAYLOD_STOP)
 			{
 				copter.flowmeter.set_coeffcient((copter.flowmeter.get_data()._pulses_num*100)/copter.flowmeter.get_adjustment_amount());
 				copter.sprayer.run(false);
