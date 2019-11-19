@@ -1,3 +1,5 @@
+#include "defines.h"	//sunkaidao added in 191114
+
 // User specific config file.  Any items listed in config.h can be overridden here.
 
 // If you used to define your CONFIG_APM_HARDWARE setting here, it is no longer
@@ -130,4 +132,15 @@ struct current_gps_week_ms
 #define SPRAYER_ENABLED       ENABLED
 
 #define NEWBROADCAST          ENABLED
+
+//sunkaidao added in 191015
+#ifndef FLOWMETER
+#define FLOWMETER ENABLED
+#endif
+//added end
+//sunkaidao added in 191113
+#ifndef GROUPING
+#define GROUPING ENABLED
+#endif
+//added end
 

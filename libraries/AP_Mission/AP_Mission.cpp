@@ -6,6 +6,7 @@
 #include <GCS_MAVLink/GCS.h>
 #include <AP_AHRS/AP_AHRS.h>
 #include <AP_Logger/AP_Logger.h>
+#include "./../ArduCopter/Roflying_Config.h"
 
 const AP_Param::GroupInfo AP_Mission::var_info[] = {
 
@@ -851,6 +852,12 @@ MAV_MISSION_RESULT AP_Mission::mavlink_int_to_mission_cmd(const mavlink_mission_
 #else
         // delay at waypoint in seconds (this is for copters???)
         cmd.p1 = packet.param1;
+//sunkaidao added in 191113
+#if GROUPING == ENABLED
+		cmd.p1 = ((uint8_t)packet.param1 << 8)| ((uint8_t)packet.param2 & 0xff);
+#endif
+//added end
+
 #endif
     }
         break;
@@ -1095,6 +1102,13 @@ MAV_MISSION_RESULT AP_Mission::mavlink_int_to_mission_cmd(const mavlink_mission_
         cmd.p1 = packet.param1; 
         break;
     //added end
+	//sunkaidao added in 191113
+#if GROUPING == ENABLED
+	case MAV_CMD_DO_GROUPING:
+		cmd.p1 = ((uint8_t)packet.param1 << 8)| ((uint8_t)packet.param3 & 0xff);
+		break;
+#endif
+	//added end
 
     case MAV_CMD_NAV_SET_YAW_SPEED:
         cmd.content.set_yaw_speed.angle_deg = packet.param1;        // target angle in degrees
@@ -1303,6 +1317,13 @@ bool AP_Mission::mission_cmd_to_mavlink_int(const AP_Mission::Mission_Command& c
 #else
         // delay at waypoint in seconds
         packet.param1 = cmd.p1;
+//sunkaidao added in 191113
+	#if GROUPING == ENABLED
+		packet.param1 = HIGHBYTE(cmd.p1);
+		packet.param2 = LOWBYTE(cmd.p1);
+	#endif
+//added end
+
 #endif
         break;
 
@@ -1538,6 +1559,14 @@ bool AP_Mission::mission_cmd_to_mavlink_int(const AP_Mission::Mission_Command& c
         packet.param1 = cmd.p1;
         break;
     //added end
+	//sunkaidao added in 191113
+#if GROUPING == ENABLED
+	case MAV_CMD_DO_GROUPING:
+		packet.param1 = HIGHBYTE(cmd.p1);
+		packet.param3 = LOWBYTE(cmd.p1);
+		break;
+#endif
+		//added end
 
     case MAV_CMD_NAV_SET_YAW_SPEED:
         packet.param1 = cmd.content.set_yaw_speed.angle_deg;        // target angle in degrees
@@ -1551,7 +1580,6 @@ bool AP_Mission::mission_cmd_to_mavlink_int(const AP_Mission::Mission_Command& c
         packet.param3 = cmd.content.winch.release_length;   // cable distance to unwind in meters, negative numbers to wind in cable
         packet.param4 = cmd.content.winch.release_rate;     // release rate in meters/second
         break;
-
     default:
         // unrecognised command
         return false;

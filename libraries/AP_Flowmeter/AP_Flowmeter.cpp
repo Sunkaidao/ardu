@@ -154,3 +154,14 @@ void AP_Flowmeter::set_coeffcient(float coe)
 
 }
 
+#if GROUPING == ENABLED
+void AP_Flowmeter::spray_amount(uint8_t grouping)
+{
+	if(grouping > 30 || grouping == 0)
+		group_amount = grouping;
+	else
+		group_amount = 30;
+}
+#endif
+
+

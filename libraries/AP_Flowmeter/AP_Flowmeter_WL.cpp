@@ -18,6 +18,7 @@ AP_Flowmeter_WL::~AP_Flowmeter_WL(void)
 void AP_Flowmeter_WL::init()
 {
 
+
 }
 
 
@@ -27,13 +28,23 @@ void AP_Flowmeter_WL::update()
 	if(res != 1)
 		return;
 	calculate();
-////////////////////////////////
-//Add short sides here
-//if short != 1 	
-//NO_drug
-////////////////////////////////
+
+
+#if GROUPING == ENABLED
+	if(get_short_flag()== 0 && expect_output != 0)
+	{
+		NO_drug();
+	}
+	control(compute_speed_grouping(get_group_amount()));
+#else
+	////////////////////////////////
+	//Add short sides here
+	//if short != 1 	
+	//NO_drug
+	////////////////////////////////
 	NO_drug();
-	control(expect());
+	control(compute_speed());
+#endif
 	_sprayer->set_flow(get_type(),actual_pump_rate);
 }
 void AP_Flowmeter_WL::calculate()
@@ -49,7 +60,7 @@ void AP_Flowmeter_WL::calculate()
 	_data._output = actual_pump_rate;
 	//printf("\n%d 	%d	%d\nrate is %d amount is %d pulse each is %d\n",get_pin(),_data._pulses_num,_data._time,_data._flow_rate,_data._volume,_data._pulses_each);
 }
-uint16_t AP_Flowmeter_WL::expect()
+uint16_t AP_Flowmeter_WL::compute_speed()
 {
 	const Vector3f &velocity = _inav->get_velocity();
     float ground_speed = norm(velocity.x,velocity.y);//cm
@@ -87,37 +98,44 @@ uint16_t AP_Flowmeter_WL::expect()
 
 void AP_Flowmeter_WL::control(uint16_t _expect)
 {
-		float	control_P;
+	float	control_P;
 
-		if(_expect == 0)
-		{
-			actual_pump_rate = get_output_min();
-			return;
-		}
-		difference = _expect - _data._flow_rate;
-		control_P =get_P().get_p(difference);
-		difference=control_P;
-		if(difference<0)
-		{	
-			if(actual_pump_rate>0)
-			actual_pump_rate=actual_pump_rate+difference;
-			if(actual_pump_rate<0)
-				actual_pump_rate=0;
-		}
-		else if(difference>0)
-		{	
-			if(actual_pump_rate<10000)
-			actual_pump_rate=actual_pump_rate+difference;
-			if(actual_pump_rate>10000)
-				actual_pump_rate=10000;
-		}
-		else
-			{
-	
-		}
-		if(actual_pump_rate < get_output_min())
-			actual_pump_rate = get_output_min();
+	if(_expect == 0)
+	{
+		actual_pump_rate = get_output_min();
 		return;
+	}
+#if GROUPING == ENABLED
+	if(_sprayer->spraying()==0||_sprayer->running()==0||get_short_flag()==1)
+	{
+		actual_pump_rate = 0;
+		return;
+	}
+#endif
+	difference = _expect - _data._flow_rate;
+	control_P =get_P().get_p(difference);
+	difference=control_P;
+	if(difference<0)
+	{	
+		if(actual_pump_rate>0)
+			actual_pump_rate=actual_pump_rate+difference;
+		if(actual_pump_rate<0)
+			actual_pump_rate=0;
+	}
+	else if(difference>0)
+	{	
+		if(actual_pump_rate<10000)
+			actual_pump_rate=actual_pump_rate+difference;
+		if(actual_pump_rate>10000)
+			actual_pump_rate=10000;
+	}
+	else
+	{
+
+	}
+	if(actual_pump_rate < get_output_min())
+		actual_pump_rate = get_output_min();
+	return;
 }
 
 void AP_Flowmeter_WL::NO_drug(){
@@ -151,6 +169,9 @@ void AP_Flowmeter_WL::NO_drug(){
 		rtf.last_flag=rtf.flag;
 		
 }
+//////////////////////////
+//	drive
+//////////////////////////
 
 	
 void AP_Flowmeter_WL::update_pin()
@@ -229,4 +250,30 @@ void AP_Flowmeter_WL::irq_handler(uint8_t pin,
 	irq_state.total_count++;
 	//printf("			irq%d\n",irq_state.total_count);
 }
+//////////////////////////
+//	grouping
+//////////////////////////
+
+#if GROUPING == ENABLED
+uint16_t AP_Flowmeter_WL::compute_speed_grouping(uint8_t group_val)
+{
+	const Vector3f &velocity = _inav->get_velocity();
+    float ground_speed = norm(velocity.x,velocity.y);//cm
+    float max_speed = _wp_nav->get_default_speed_xy();
+
+
+	float output;
+	float input_coefficient;
+	
+	input_coefficient=ground_speed/(max_speed-0);
+	
+	if(get_slope()!=0)
+		output = ((get_slope()-1.0f) + safe_sqrt((1.0f-get_slope())*(1.0f-get_slope()) + 4.0f*get_slope()*input_coefficient))/(2.0f*get_slope());
+	else
+		output = input_coefficient;
+
+	expect_output=output*group_val;
+	return expect_output;
+}
+#endif
 

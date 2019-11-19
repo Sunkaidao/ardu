@@ -63,6 +63,8 @@
 #include <AP_BattMonitor/AP_BattMonitor.h>
 #include <AP_GPS/AP_GPS.h>
 
+#include "./../ArduCopter/Roflying_Config.h"//sunkaidao added in 191114
+
 extern const AP_HAL::HAL& hal;
 
 uint32_t GCS_MAVLINK::last_radio_status_remrssi_ms;

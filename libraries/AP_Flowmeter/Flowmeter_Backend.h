@@ -43,7 +43,10 @@ protected:
 	uint16_t get_volume_backend(){return _frontend._volume.get();}
 
 
-
+#if GROUPING == ENABLED
+	uint8_t get_short_flag(){return _frontend.short_flag;}
+	uint8_t get_group_amount(){return _frontend.group_amount;}
+#endif
 	void copy_state_to_frontend(uint32_t total_count, uint32_t last_reading_ms);
     
     AP_Flowmeter &_frontend;
