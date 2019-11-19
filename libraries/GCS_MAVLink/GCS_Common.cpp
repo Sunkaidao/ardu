@@ -4404,11 +4404,15 @@ bool GCS_MAVLINK::try_send_message(const enum ap_message id)
         break;
     }
 	//	added by ZhangYong 20170719
-	
+
+	//sunkaidao added in 191119
 	case MSG_PAYLOAD_STATUS:
 			CHECK_PAYLOAD_SIZE(PAYLOAD_STATUS);
 #if FLOWMETER == ENABLED
 			send_payload_status(MSG_PLD_STATUS_FLOWMETER);
+#endif
+#if GASSENSOR == ENABLED
+			send_payload_status(MSG_PLD_STATUS_GAS);
 #endif
 	break;
 

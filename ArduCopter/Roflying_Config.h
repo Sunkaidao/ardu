@@ -140,7 +140,10 @@ struct current_gps_week_ms
 //added end
 //sunkaidao added in 191113
 #ifndef GROUPING
-#define GROUPING ENABLED
+#define GROUPING DISABLED
 #endif
 //added end
+#ifndef GASSENSOR
+#define GASSENSOR DISABLED
+#endif
 

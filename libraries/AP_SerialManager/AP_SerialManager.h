@@ -84,6 +84,11 @@
 #define AP_SERIALMANAGER_FLOWMETER_GKXN_BUFSIZE_RX     	128
 #define AP_SERIALMANAGER_FLOWMETER_GKXN_BUFSIZE_TX     	128
 //added end
+//sunkaidao added in 191112
+#define AP_SERIALMANAGER_AIRSENSOR_BAUD                9600
+#define AP_SERIALMANAGER_AIRSENSOR_BUFSIZE_RX          128
+#define AP_SERIALMANAGER_AIRSENSOR_BUFSIZE_TX          128
+//added end
 
 class AP_SerialManager {
 public:
@@ -120,6 +125,7 @@ public:
         SerialProtocol_SLCAN = 22,
         SerialProtocol_FlowMeter_GKXN = 23,
         SerialProtocol_NewBroadcast = 24,
+        SerialProtocol_Airsensor = 25,				//sunkaidao added in 191112
     };
 
     // get singleton instance

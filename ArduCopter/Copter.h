@@ -193,6 +193,11 @@
 #endif
 //added end
 
+//sunkaidao added in 191112
+#if GASSENSOR == ENABLED
+#include <AP_Gassensor/AP_Gassensor.h>
+#endif
+//added end
 
 #if FRAME_CONFIG == HELI_FRAME
     #define AC_AttitudeControl_t AC_AttitudeControl_Heli
@@ -254,8 +259,8 @@ public:
 	friend class ModeZigZagAB;
 
 	friend class AP_ABMission; //baiyang added in 20190827
-	friend class AP_Flowmeter;
-
+	friend class AP_Flowmeter; //sunkaidao added in 191112
+	friend class AP_Gassensor; //sunkaidao added in 191112
     Copter(void);
 
     // HAL::Callbacks implementation.
@@ -628,6 +633,11 @@ private:
 #endif
 //added end
 
+//sunkaidao added in 191112
+#if GASSENSOR == ENABLED
+	AP_Gassensor gassensor;
+#endif
+//added end
 #if FRAME_CONFIG == HELI_FRAME
     // Mode filter to reject RC Input glitches.  Filter size is 5, and it draws the 4th element, so it can reject 3 low glitches,
     // and 1 high glitch.  This is because any "off" glitches can be highly problematic for a helicopter running an ESC

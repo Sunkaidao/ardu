@@ -35,6 +35,7 @@ def build(bld):
             'AP_KDECAN',
             'AP_NewBroadcast',
             'AP_Flowmeter',
+            'AP_Gassensor',
         ],
     )
 

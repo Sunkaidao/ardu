@@ -47,10 +47,9 @@ const AP_Param::GroupInfo AP_Flowmeter::var_info[] = {
 };
 
 
-AP_Flowmeter::AP_Flowmeter(const AP_InertialNav* inav,AC_Sprayer* sprayer,const AC_WPNav* wp_nav):
+AP_Flowmeter::AP_Flowmeter(const AP_InertialNav* inav,AC_Sprayer* sprayer):
 	_sprayer(sprayer),
 	_inav(inav),
-	_wp_nav(wp_nav),
 	_P(200)
 {
 	res = 0 ;
@@ -78,7 +77,7 @@ uint8_t AP_Flowmeter::detect_backends()
 			//printf("AP_Flowmeter_WL new\n");
 			break;
 		case 2:
-			new_backend = new AP_Flowmeter_WL(*this,status,data,_inav,_sprayer,_wp_nav);
+			new_backend = new AP_Flowmeter_WL(*this,status,data,_inav,_sprayer,copter.wp_nav);
 			//printf("AP_Flowmeter_WL new\n");
 			break;
 		default:

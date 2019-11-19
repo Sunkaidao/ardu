@@ -1233,6 +1233,28 @@ struct PACKED log_Flowmeter {
 	uint32_t 	_output_pwm;
 
 };
+struct PACKED log_Sensor{
+    LOG_PACKET_HEADER;
+	uint64_t time_us;
+	float CO;
+	float SO2;
+	float NO2;
+	float O3;
+	float X1;
+	float X2;
+	float CO2;
+	float PM1_0;
+	float PM2_5;
+	float PM10;
+	float TEMP;
+	float HUM;
+};
+
+#define GASSENSOR_LABELS "TimeUS,CO,SO2,NO2,O3,X1,X2,CO2,PM1,PM25,PM10,TEMP,HUM"
+#define GASSENSOR_FMT   "Qffffffffffff"
+#define GASSENSOR_UNITS "s------------"
+#define GASSENSOR_MULTS "F------------"
+
 #define FLOWMETER_LABELS "TimeUS,RA,ERA,PNM,PEH,VO,TI,HB,WAR,HE,PWM"
 #define FLOWMETER_FMT   "QBHIIHIIBBI"
 #define FLOWMETER_UNITS "s--uu-s----"
@@ -1621,7 +1643,9 @@ struct PACKED log_Flowmeter {
     { LOG_ADSB_MSG, sizeof(log_ADSB), \
       "ADSB",  "QIiiiHHhH", "TimeUS,ICAO_address,Lat,Lng,Alt,Heading,Hor_vel,Ver_vel,Squark", "s-DUmhnn-", "F-GGCBCC-" }, \
 	{ LOG_FLOWMETER_MSG, sizeof(log_Flowmeter), \
-      "FLOW",  FLOWMETER_FMT,FLOWMETER_LABELS,FLOWMETER_UNITS,FLOWMETER_MULTS}
+      "FLOW",  FLOWMETER_FMT,FLOWMETER_LABELS,FLOWMETER_UNITS,FLOWMETER_MULTS}, \
+    { LOG_SENSOR_MSG, sizeof(log_Sensor), \
+	  "SEN",  GASSENSOR_FMT,GASSENSOR_LABELS,GASSENSOR_UNITS,GASSENSOR_MULTS }
 
 
 #define LOG_SBP_STRUCTURES \
@@ -1813,6 +1837,7 @@ enum LogMessages : uint8_t {
     LOG_OA_BENDYRULER_MSG,
     LOG_OA_DIJKSTRA_MSG,
 	LOG_FLOWMETER_MSG,
+	LOG_SENSOR_MSG,
 
     _LOG_LAST_MSG_,
 };

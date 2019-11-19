@@ -52,7 +52,7 @@ public:
 	};
 
 
-	AP_Flowmeter(const AP_InertialNav* inav,AC_Sprayer* sprayer,const AC_WPNav* wp_nav);
+	AP_Flowmeter(const AP_InertialNav* inav,AC_Sprayer* sprayer);
 	~AP_Flowmeter(void);
 	void init(void);
 	void update(void);
@@ -85,7 +85,6 @@ private:
 	
 	AC_Sprayer* _sprayer;	
 	const AP_InertialNav* const _inav;
-	const AC_WPNav* const _wp_nav;
 	
 	AC_P	_P;
     AP_Int8		_pin;

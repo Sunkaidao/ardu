@@ -65,9 +65,6 @@ uint16_t AP_Flowmeter_WL::compute_speed()
 	const Vector3f &velocity = _inav->get_velocity();
     float ground_speed = norm(velocity.x,velocity.y);//cm
     float max_speed = _wp_nav->get_default_speed_xy();
-	if(max_speed == 0)
-		max_speed = 500;
-//	printf("	max_speed is %f		ground_speed is %f\n ",max_speed,ground_speed);
 	if(_sprayer->spraying()==0||_sprayer->running()==0)
 	{
 		return 0;
@@ -194,9 +191,7 @@ void AP_Flowmeter_WL::update_pin()
 										bool,
 										uint32_t),
 					AP_HAL::GPIO::INTERRUPT_RISING)) {
-					
-					printf("error\n",last_pin);
-				gcs().send_text(MAV_SEVERITY_WARNING, "FuelLevelPWM: Failed to attach to pin %u", unsigned(last_pin));
+					gcs().send_text(MAV_SEVERITY_WARNING, "pwm input error pin is %u", unsigned(last_pin));
 			}
 		else
 		{
