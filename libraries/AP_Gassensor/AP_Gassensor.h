@@ -63,9 +63,11 @@ private:
 	uint32_t Sen_flag;
 	uint8_t rxdata12_len;
 	uint8_t rxdata6_len;
-	uint8_t rx_len_flag;
+	uint16_t rx_len_flag;
+	int readdata;
 	//uint8_t tx_six;
 	uint8_t turn_read;
+
 	enum Gassensor_CMD {
 			fixed = 0x00,
 			onboard =0x01

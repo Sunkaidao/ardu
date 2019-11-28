@@ -241,15 +241,15 @@ void GCS_MAVLINK_Copter::send_payload_status(enum pld_status para_pld_status)
 					AP_HAL::millis(),
 					MSG_PLD_STATUS_GAS,
 					0,1,
-					data12[5],data12[6],
-					data12[7],data12[8],
-					data12[9],data12[10]);
+					data6[5],data6[6],
+					data6[7],data6[8],
+					data6[9],data6[10]);
 				mavlink_msg_payload_status_send(chan,
 					AP_HAL::millis(),
 					MSG_PLD_STATUS_GAS,
 					0,2,
-					data12[15],data12[16],
-					data12[17],data12[18],
+					data6[15],data6[16],
+					data6[17],data6[18],
 					data6[19],data6[20]);
 				mavlink_msg_payload_status_send(chan,
 					AP_HAL::millis(),
@@ -283,16 +283,16 @@ void GCS_MAVLINK_Copter::send_payload_status(enum pld_status para_pld_status)
 					AP_HAL::millis(),
 					MSG_PLD_STATUS_GAS,
 					0,7,
-					data6[15],data6[16],
-					data6[17],data6[18],
-					data6[19],data6[20]);
+					data12[15],data12[16],
+					data12[17],data12[18],
+					data12[19],data12[20]);
 				mavlink_msg_payload_status_send(chan,
 					AP_HAL::millis(),
 					MSG_PLD_STATUS_GAS,
 					0,8,
-					data6[21],data6[22],
-					data6[23],data6[24],
-					data6[25],data6[26]);
+					data12[21],data12[22],
+					data12[23],data12[24],
+					data12[25],data12[26]);
 				break;
 #endif
 			default:
